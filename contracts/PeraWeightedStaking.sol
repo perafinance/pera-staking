@@ -15,18 +15,18 @@ contract PeraWeightedStaking is Ownable {
     uint256 public lastUpdateTime; //
     uint256 public rewardPerTokenStored; //
 
-    uint256 private totalStaked; // _totalSupply
+    uint256 public totalStaked; // _totalSupply
     // Total weighted staking amount of the users
-    uint256 private wTotalStaked;
+    uint256 public wTotalStaked;
 
-    mapping(address => uint256) private userStaked; // _balances
+    mapping(address => uint256) public userStaked; // _balances
     mapping(address => uint256) public userRewardPerTokenPaid; //
     mapping(address => uint256) public rewards; //
 
     // Users staking coefficient
-    mapping(address => uint256) private userWeights;
+    mapping(address => uint256) public userWeights;
     // Unlocking timestamp of the users
-    mapping(address => uint256) private userUnlockingTime;
+    mapping(address => uint256) public userUnlockingTime;
 
     constructor(
         address _peraAddress,
@@ -49,7 +49,7 @@ contract PeraWeightedStaking is Ownable {
 
         userWeights[msg.sender] = calcWeight(_time);
         userUnlockingTime[msg.sender] = block.timestamp + _time;
-        wTotalStaked += calcWeightedStake(msg.sender);
+        wTotalStaked += (userWeights[msg.sender] * _amount);
         _increase(_amount);
     }
 
@@ -60,7 +60,7 @@ contract PeraWeightedStaking is Ownable {
     {
         require(userUnlockingTime[msg.sender] != 0, "Initial stake not found!");
         require(_amount > 0, "Insufficient stake amount.");
-        wTotalStaked += calcWeightedStake(msg.sender);
+        wTotalStaked += (userWeights[msg.sender] * _amount);
         _increase(_amount);
     }
 
@@ -108,12 +108,14 @@ contract PeraWeightedStaking is Ownable {
 
         if ((_time / 1 weeks) < 12) {
             return 150;
-        } else return 200;
+        } else {
+            return 200;
+        }
     }
 
     // This function calculates users weighted stakin amounts
     function calcWeightedStake(address _user) public view returns (uint256) {
-        return (userWeights[_user] * userStaked[_user]) / 100;
+        return (userWeights[_user] * userStaked[_user]);
     }
 
     function rewardPerToken() public view returns (uint256) {
