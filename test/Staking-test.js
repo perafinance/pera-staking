@@ -2,23 +2,6 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const provider = ethers.provider;
 
-async function increaseWeeks(value) {
-    value = weekToSecs(value);
-    if (!ethers.BigNumber.isBigNumber(value)) {
-        value = ethers.BigNumber.from(value);
-    }
-    await provider.send('evm_increaseTime', [value.toNumber()]);
-    await provider.send('evm_mine');
-}
-
-async function increaseSeconds(value) {
-    if (!ethers.BigNumber.isBigNumber(value)) {
-        value = ethers.BigNumber.from(value);
-    }
-    await provider.send('evm_increaseTime', [value.toNumber()]);
-    await provider.send('evm_mine');
-}
-
 async function getBlockTimestamp() {
     let block_number, block, block_timestamp;
 
@@ -114,7 +97,6 @@ describe("Weighted Stakng Test", function () {
         });
 
         it("Gets rewards", async function () {
-            await network.provider.send("evm_setAutomine", [false]);
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 6]);
             await Staking.connect(addr1).claimReward();
             await provider.send('evm_mine');
@@ -122,7 +104,6 @@ describe("Weighted Stakng Test", function () {
         });
 
         it("Gets rewards again, and new staker", async function () {
-            await network.provider.send("evm_setAutomine", [false]);
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 10]);
             await Staking.connect(addr1).claimReward();     
             await Staking.connect(addr2).initialStake(ethers.utils.parseEther("100"), weekToSecs(4));
@@ -140,7 +121,6 @@ describe("Weighted Stakng Test", function () {
         });
 
         it("Calculates rewards for same passing time", async function () {
-            await network.provider.send("evm_setAutomine", [false]);
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 17]);
             await Staking.connect(addr1).claimReward();     
             await Staking.connect(addr2).claimReward();     
