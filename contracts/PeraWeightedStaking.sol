@@ -54,7 +54,10 @@ contract PeraWeightedStaking is Ownable {
     }
 
     // Edits users stake positions and allow if it's possible
-    function additionalStake(uint256 _amount) external updateReward(msg.sender) {
+    function additionalStake(uint256 _amount)
+        external
+        updateReward(msg.sender)
+    {
         require(userUnlockingTime[msg.sender] != 0, "Initial stake not found!");
         require(_amount > 0, "Insufficient stake amount.");
         wTotalStaked += calcWeightedStake(msg.sender);
@@ -102,7 +105,10 @@ contract PeraWeightedStaking is Ownable {
     function calcWeight(uint256 _time) public pure returns (uint256) {
         // TODO: implement coefficient function on the base of 100
         // 150 is returned as a mock variable aka coef: 1.5
-        return 150 + _time*0;
+
+        if ((_time / 1 weeks) < 12) {
+            return 150;
+        } else return 200;
     }
 
     // This function calculates users weighted stakin amounts
