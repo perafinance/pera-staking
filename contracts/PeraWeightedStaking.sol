@@ -28,6 +28,16 @@ contract PeraWeightedStaking is Ownable {
     // Unlocking timestamp of the users
     mapping(address => uint256) public userUnlockingTime;
 
+    event Staked(address _user, uint256 _amount, uint256 _time);
+    event IncreaseStaked(address _user, uint256 _amount);
+    event PunishedWithdraw(
+        address _user,
+        uint256 _burntAmount,
+        uint256 _amount
+    );
+    event Withdraw(address _user, uint256 _amount);
+    event Claimed(address _user, uint256 _amount);
+
     constructor(
         address _peraAddress,
         address _punishmentAddress,
@@ -50,6 +60,7 @@ contract PeraWeightedStaking is Ownable {
         userWeights[msg.sender] = calcWeight(_time);
         userUnlockingTime[msg.sender] = block.timestamp + _time;
         wTotalStaked += (userWeights[msg.sender] * _amount);
+        emit Staked(msg.sender, _amount, _time);
         _increase(_amount);
     }
 
@@ -61,6 +72,7 @@ contract PeraWeightedStaking is Ownable {
         require(userUnlockingTime[msg.sender] != 0, "Initial stake not found!");
         require(_amount > 0, "Insufficient stake amount.");
         wTotalStaked += (userWeights[msg.sender] * _amount);
+        emit IncreaseStaked(msg.sender, _amount);
         _increase(_amount);
     }
 
@@ -81,11 +93,17 @@ contract PeraWeightedStaking is Ownable {
                 wTotalStaked -= userWeights[msg.sender] * _amount;
                 userWeights[msg.sender] -= userWeights[msg.sender] * _amount;
             }
+            emit Withdraw(msg.sender, _amount);
             _decrease(_amount, 0);
             // early withdrawing with punishments
         } else {
             // TODO: Implement unstaking with punishment - i made a mock version with 50% cut
             uint256 _punishmentRate = 50;
+            emit PunishedWithdraw(
+                msg.sender,
+                (_amount * _punishmentRate) / 100,
+                (_amount * (100 - _punishmentRate)) / 100
+            );
             _decrease(_amount, _punishmentRate);
         }
     }
@@ -94,6 +112,7 @@ contract PeraWeightedStaking is Ownable {
     function claimReward() external updateReward(msg.sender) {
         uint256 _reward = rewards[msg.sender];
         rewards[msg.sender] = 0;
+        emit Claimed(msg.sender, _reward);
         pera.safeTransfer(msg.sender, _reward);
     }
 
