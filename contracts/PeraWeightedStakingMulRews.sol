@@ -170,15 +170,10 @@ contract PeraWeightedStakingMulRews is Ownable {
 
         uint256 deadline = rewardTokens[_rewardTokenIndex].deadline;
 
-        // TODO: turn to just one if else
-        if (deadline == 0) {
+        if (deadline == 0 || block.timestamp < deadline) {
             deadline = block.timestamp;
         } else {
-            if (block.timestamp < deadline) {
-                deadline = block.timestamp;
-            } else {
-                deadline = lastUpdateTime;
-            }
+            deadline = lastUpdateTime;
         }
         
         // TODO: implement for different decimal possiblities
