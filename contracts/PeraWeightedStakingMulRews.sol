@@ -48,6 +48,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     );
     event Withdraw(address _user, uint256 _amount);
     event Claimed(address _user);
+    event NewReward(address _tokenAddress, uint256 _id);
 
     constructor(
         address _peraAddress,
@@ -62,7 +63,7 @@ contract PeraWeightedStakingMulRews is Ownable {
             18
         );
         rewardTokens.push(info);
-        activeRewards.add(0);
+        activeRewards.add(rewardTokens.length - 1);
         punishmentAddress = _punishmentAddress;
     }
 
@@ -128,18 +129,59 @@ contract PeraWeightedStakingMulRews is Ownable {
 
     // Claims users rewards externally or by the other functions before reorganizations
     function claimReward() external updateReward(msg.sender) {
-        for(uint256 i = 0; i < activeRewards.length(); i++) {
+        //console.log(activeRewards.length());
+        for (uint256 i = 0; i < activeRewards.length(); i++) {
             uint256 _reward = tokenRewards[activeRewards.at(i)][msg.sender];
-            tokenRewards[activeRewards.at(i)][msg.sender] = 0;
-            rewardTokens[activeRewards.at(i)].tokenInstance.safeTransfer(msg.sender, _reward);
+            if (_reward > 0) {
+                tokenRewards[activeRewards.at(i)][msg.sender] = 0;
+                rewardTokens[activeRewards.at(i)].tokenInstance.safeTransfer(
+                    msg.sender,
+                    _reward
+                );
+            }
         }
 
         emit Claimed(msg.sender);
     }
 
-    function depositRewardTokens(uint256 _amount) external onlyOwner {
-        // TODO: implement different deposits
-        rewardTokens[0].tokenInstance.safeTransferFrom(
+    function addNewRewardToken(
+        address _tokenAddress,
+        uint256 _rewardRate,
+        uint256 _deadline,
+        uint8 _decimals
+    ) external onlyOwner updateReward(address(0)) {
+        RewardTokensInfo memory info = RewardTokensInfo(
+            IERC20(_tokenAddress),
+            _rewardRate,
+            0,
+            _deadline,
+            _decimals
+        );
+
+        rewardTokens.push(info);
+        activeRewards.add(rewardTokens.length - 1);
+
+        emit NewReward(_tokenAddress, rewardTokens.length - 1);
+    }
+
+    function delistRewardToken(uint256 _id) external onlyOwner {
+        require(
+            rewardTokens[_id].deadline < block.timestamp,
+            "The distribution timeline has not over."
+        );
+        require(activeRewards.remove(_id), "Delisting unsuccessful");
+    }
+
+    function depositRewardTokens(uint256 _id, uint256 _amount)
+        external
+        onlyOwner
+    {
+        require(
+            activeRewards.contains(_id),
+            "Not an active reward distribution."
+        );
+
+        rewardTokens[_id].tokenInstance.safeTransferFrom(
             msg.sender,
             address(this),
             _amount
@@ -174,16 +216,14 @@ contract PeraWeightedStakingMulRews is Ownable {
 
         if (deadline == 0 || block.timestamp < deadline) {
             deadline = block.timestamp;
-        } else {
-            deadline = lastUpdateTime;
         }
-        
+
         // TODO: implement for different decimal possiblities
         return
             rewardTokens[_rewardTokenIndex].rewardPerTokenStored +
             (((deadline - lastUpdateTime) *
                 rewardTokens[_rewardTokenIndex].rewardRate *
-                1e18) / wTotalStaked);
+                10**rewardTokens[_rewardTokenIndex].decimals) / wTotalStaked);
     }
 
     function earned(address _user, uint256 _rewardTokenIndex)
@@ -195,7 +235,8 @@ contract PeraWeightedStakingMulRews is Ownable {
             ((calcWeightedStake(_user) *
                 (rewardPerToken(_rewardTokenIndex) -
                     userRewardsPerTokenPaid[_rewardTokenIndex][_user])) /
-                10**rewardTokens[_rewardTokenIndex].decimals) + tokenRewards[_rewardTokenIndex][_user];
+                10**rewardTokens[_rewardTokenIndex].decimals) +
+            tokenRewards[_rewardTokenIndex][_user];
     }
 
     /** 
@@ -236,16 +277,17 @@ contract PeraWeightedStakingMulRews is Ownable {
                 .rewardPerTokenStored = rewardPerToken(activeRewards.at(i));
             lastUpdateTime = block.timestamp;
 
-            tokenRewards[activeRewards.at(i)][_user] = earned(
-                _user,
-                activeRewards.at(i)
-            );
-
-            userRewardsPerTokenPaid[activeRewards.at(i)][_user] = rewardTokens[
-                activeRewards.at(i)
-            ].rewardPerTokenStored;
-
-            if(i != activeRewards.length() - 1) lastUpdateTime = _lastUpdateTime;
+            if (_user != address(0)) {
+                tokenRewards[activeRewards.at(i)][_user] = earned(
+                    _user,
+                    activeRewards.at(i)
+                );
+                userRewardsPerTokenPaid[activeRewards.at(i)][
+                    _user
+                ] = rewardTokens[activeRewards.at(i)].rewardPerTokenStored;
+            }
+            if (i != activeRewards.length() - 1)
+                lastUpdateTime = _lastUpdateTime;
         }
         _;
     }

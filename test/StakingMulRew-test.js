@@ -29,7 +29,7 @@ function ethToNumber(value) {
 
 describe("Weighted Mul Rew Stakng Test", function () {
     let owner, addr1, addr2, punishment;
-    let Token, Pera;
+    let Token, Pera, OthToken;
     let PWStaking, Staking;
     const STAKE_POOL = ethers.utils.parseUnits("3144960000", 18);
     const DISTR_AMOUNT = ethers.utils.parseUnits("500", 18);
@@ -39,6 +39,7 @@ describe("Weighted Mul Rew Stakng Test", function () {
 
         Token = await ethers.getContractFactory("MockToken");
         Pera = await Token.deploy();
+        OthToken = await Token.deploy();
 
         PWStaking = await ethers.getContractFactory("PeraWeightedStakingMulRews");
         Staking = await PWStaking.deploy(Pera.address, punishment.address, ethers.utils.parseEther("100"));
@@ -48,20 +49,20 @@ describe("Weighted Mul Rew Stakng Test", function () {
         await Pera.connect(addr2).approve(Staking.address, ethers.constants.MaxUint256);
         await Pera.connect(owner).transfer(addr1.address, DISTR_AMOUNT);
         await Pera.connect(owner).transfer(addr2.address, DISTR_AMOUNT);
-        await Staking.connect(owner).depositRewardTokens(STAKE_POOL);
+        await Staking.connect(owner).depositRewardTokens("0", STAKE_POOL);
+        
+        await OthToken.connect(owner).approve(Staking.address, ethers.constants.MaxUint256);
+        await OthToken.connect(addr1).approve(Staking.address, ethers.constants.MaxUint256);
+        await OthToken.connect(addr2).approve(Staking.address, ethers.constants.MaxUint256);
+        await OthToken.connect(owner).transfer(addr1.address, DISTR_AMOUNT);
+        await OthToken.connect(owner).transfer(addr2.address, DISTR_AMOUNT);
     });
 
     it("Deploys contracts", async function () {
         expect(Pera.address).to.be.properAddress;
         expect(Staking.address).to.be.properAddress;
+        expect(OthToken.address).to.be.properAddress;
     });
-
-    // it("Distributes and Approves", async function () {
-    //     for (let i = 0; i < addresses.length; i++) {
-    //         expect(Number(ethers.utils.formatEther(await Pera.allowance(addresses[i].address, Staking.address)))).to.be.greaterThan(0);
-    //         expect(Number(ethers.utils.formatEther(await Pera.balanceOf(addresses[i].address)))).to.be.greaterThan(0);
-    //     }
-    // });
 
     it("Deposits rewards", async function () {
         expect(await Pera.balanceOf(Staking.address)).to.be.equal(STAKE_POOL);
@@ -100,7 +101,6 @@ describe("Weighted Mul Rew Stakng Test", function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 6]);
             await Staking.connect(addr1).claimReward();
             await provider.send('evm_mine');
-            console.log(await Pera.balanceOf(addr1.address), userBalances[0]);
             expect(ethToNumber(await Pera.balanceOf(addr1.address))).to.be.equal(userBalances[0] + 500);
         });
 
@@ -128,6 +128,31 @@ describe("Weighted Mul Rew Stakng Test", function () {
             await provider.send('evm_mine');
             expect(ethToNumber(await Pera.balanceOf(addr1.address))).to.be.equal(userBalances[0] + 400);
             expect(ethToNumber(await Pera.balanceOf(addr2.address))).to.be.equal(userBalances[1] + 300);
+        });
+
+        it("Adds a new token reward", async function () {
+            await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 20]);
+            await Staking.connect(owner).addNewRewardToken(OthToken.address, ethers.utils.parseUnits("50", 18), (initialTimestamp + 25), "18");
+            await Staking.connect(owner).depositRewardTokens("1", ethers.utils.parseUnits("250", 18));
+            await provider.send('evm_mine');
+            expect(ethToNumber(await OthToken.balanceOf(Staking.address))).to.be.equal(ethToNumber(ethers.utils.parseUnits("250", 18)));
+        });
+
+        it("Claims with new tokens", async function () {
+            console.log(ethToNumber(await OthToken.balanceOf(addr1.address)));
+            console.log(ethToNumber(await OthToken.balanceOf(addr2.address)));
+
+            await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 22]);
+            await Staking.connect(addr1).claimReward();     
+            await Staking.connect(addr2).claimReward();    
+            await provider.send('evm_mine');
+
+            // expect(ethToNumber(await Pera.balanceOf(addr1.address))).to.be.equal(userBalances[0] + 800);
+            // expect(ethToNumber(await Pera.balanceOf(addr2.address))).to.be.equal(userBalances[1] + 600);
+
+            console.log(ethToNumber(await OthToken.balanceOf(addr1.address)));
+            console.log(ethToNumber(await OthToken.balanceOf(addr2.address)));
+
         });
     });
 });
