@@ -15,6 +15,7 @@ contract PeraWeightedStakingMulRews is Ownable {
         uint256 rewardRate;
         uint256 rewardPerTokenStored;
         uint256 deadline;
+        uint8 decimals;
     }
 
     address public punishmentAddress;
@@ -57,7 +58,8 @@ contract PeraWeightedStakingMulRews is Ownable {
             IERC20(_peraAddress),
             _rewardRate,
             0,
-            0
+            0,
+            18
         );
         rewardTokens.push(info);
         activeRewards.add(0);
@@ -193,7 +195,7 @@ contract PeraWeightedStakingMulRews is Ownable {
             ((calcWeightedStake(_user) *
                 (rewardPerToken(_rewardTokenIndex) -
                     userRewardsPerTokenPaid[_rewardTokenIndex][_user])) /
-                1e18) + tokenRewards[_rewardTokenIndex][_user];
+                10**rewardTokens[_rewardTokenIndex].decimals) + tokenRewards[_rewardTokenIndex][_user];
     }
 
     /** 
