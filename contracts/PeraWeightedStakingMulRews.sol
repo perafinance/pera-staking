@@ -1,15 +1,10 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
+import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
-    // IERC20 tokenInstance;
-    // uint256 rewardRate;
-    // uint256 rewardPerTokenStored;
-    // mapping(address => uint256) userRewardPerTokenPaid;
-    // mapping(address => uint256) rewards;
 
 contract PeraWeightedStakingMulRews is Ownable {
     using SafeERC20 for IERC20;
@@ -19,16 +14,16 @@ contract PeraWeightedStakingMulRews is Ownable {
         IERC20 tokenInstance;
         uint256 rewardRate;
         uint256 rewardPerTokenStored;
+        uint256 deadline;
     }
 
-    // $PERA instance
     address public punishmentAddress;
 
+    RewardTokensInfo[] private rewardTokens; // TODO: can be removed and change by a mapping
     EnumerableSet.UintSet private activeRewards;
-    RewardTokensInfo[] private rewardTokens;
-    mapping(uint256 => mapping(address => uint256)) private userRewardsPerTokenPaid;
+    mapping(uint256 => mapping(address => uint256))
+        private userRewardsPerTokenPaid;
     mapping(uint256 => mapping(address => uint256)) private tokenRewards;
-
 
     uint256 public lastUpdateTime; //
 
@@ -51,15 +46,21 @@ contract PeraWeightedStakingMulRews is Ownable {
         uint256 _amount
     );
     event Withdraw(address _user, uint256 _amount);
-    event Claimed(address _user, uint256 _amount);
+    event Claimed(address _user);
 
     constructor(
         address _peraAddress,
         address _punishmentAddress,
         uint256 _rewardRate
     ) {
-        RewardTokensInfo memory info = RewardTokensInfo(IERC20(_peraAddress), _rewardRate, 0);
+        RewardTokensInfo memory info = RewardTokensInfo(
+            IERC20(_peraAddress),
+            _rewardRate,
+            0,
+            0
+        );
         rewardTokens.push(info);
+        activeRewards.add(0);
         punishmentAddress = _punishmentAddress;
     }
 
@@ -125,14 +126,22 @@ contract PeraWeightedStakingMulRews is Ownable {
 
     // Claims users rewards externally or by the other functions before reorganizations
     function claimReward() external updateReward(msg.sender) {
-        uint256 _reward = tokenRewards[0][msg.sender];
-        tokenRewards[0][msg.sender] = 0;
-        emit Claimed(msg.sender, _reward);
-        rewardTokens[0].tokenInstance.safeTransfer(msg.sender, _reward);
+        for(uint256 i = 0; i < activeRewards.length(); i++) {
+            uint256 _reward = tokenRewards[activeRewards.at(i)][msg.sender];
+            tokenRewards[activeRewards.at(i)][msg.sender] = 0;
+            rewardTokens[activeRewards.at(i)].tokenInstance.safeTransfer(msg.sender, _reward);
+        }
+
+        emit Claimed(msg.sender);
     }
 
     function depositRewardTokens(uint256 _amount) external onlyOwner {
-        rewardTokens[0].tokenInstance.safeTransferFrom(msg.sender, address(this), _amount);
+        // TODO: implement different deposits
+        rewardTokens[0].tokenInstance.safeTransferFrom(
+            msg.sender,
+            address(this),
+            _amount
+        );
     }
 
     // This function returns staking coefficient in the base of 1000 (equals 1 coefficient)
@@ -152,20 +161,44 @@ contract PeraWeightedStakingMulRews is Ownable {
         return (userWeights[_user] * userStaked[_user]);
     }
 
-    function rewardPerToken() public view returns (uint256) {
+    function rewardPerToken(uint256 _rewardTokenIndex)
+        public
+        view
+        returns (uint256)
+    {
         if (wTotalStaked == 0) return 0;
 
+        uint256 deadline = rewardTokens[_rewardTokenIndex].deadline;
+
+        // TODO: turn to just one if else
+        if (deadline == 0) {
+            deadline = block.timestamp;
+        } else {
+            if (block.timestamp < deadline) {
+                deadline = block.timestamp;
+            } else {
+                deadline = lastUpdateTime;
+            }
+        }
+        
+        // TODO: implement for different decimal possiblities
         return
-            rewardTokens[0].rewardPerTokenStored +
-            (((block.timestamp - lastUpdateTime) * rewardTokens[0].rewardRate * 1e18) /
-                wTotalStaked);
+            rewardTokens[_rewardTokenIndex].rewardPerTokenStored +
+            (((deadline - lastUpdateTime) *
+                rewardTokens[_rewardTokenIndex].rewardRate *
+                1e18) / wTotalStaked);
     }
 
-    function earned(address _user) public view returns (uint256) {
+    function earned(address _user, uint256 _rewardTokenIndex)
+        public
+        view
+        returns (uint256)
+    {
         return
             ((calcWeightedStake(_user) *
-                (rewardPerToken() - userRewardsPerTokenPaid[0][_user])) / 1e18) +
-            tokenRewards[0][_user];
+                (rewardPerToken(_rewardTokenIndex) -
+                    userRewardsPerTokenPaid[_rewardTokenIndex][_user])) /
+                1e18) + tokenRewards[_rewardTokenIndex][_user];
     }
 
     /** 
@@ -177,7 +210,11 @@ contract PeraWeightedStakingMulRews is Ownable {
     function _increase(uint256 _amount) private {
         totalStaked += _amount;
         userStaked[msg.sender] += _amount;
-        rewardTokens[0].tokenInstance.safeTransferFrom(msg.sender, address(this), _amount);
+        rewardTokens[0].tokenInstance.safeTransferFrom(
+            msg.sender,
+            address(this),
+            _amount
+        );
     }
 
     // Decreases staking positions of the users - actually "unstake/withdraw" function of general contracts
@@ -187,17 +224,32 @@ contract PeraWeightedStakingMulRews is Ownable {
         if (_punishmentRate > 0) {
             uint256 _punishment = (_amount * _punishmentRate) / 100;
             _amount = _amount - _punishment;
-            rewardTokens[0].tokenInstance.safeTransfer(punishmentAddress, _punishment);
+            rewardTokens[0].tokenInstance.safeTransfer(
+                punishmentAddress,
+                _punishment
+            );
         }
         rewardTokens[0].tokenInstance.safeTransfer(msg.sender, _amount);
     }
 
     modifier updateReward(address _user) {
-        rewardTokens[0].rewardPerTokenStored = rewardPerToken();
-        lastUpdateTime = block.timestamp;
+        for (uint256 i = 0; i < activeRewards.length(); i++) {
+            uint256 _lastUpdateTime = lastUpdateTime;
+            rewardTokens[activeRewards.at(i)]
+                .rewardPerTokenStored = rewardPerToken(activeRewards.at(i));
+            lastUpdateTime = block.timestamp;
 
-        tokenRewards[0][_user] = earned(_user);
-        userRewardsPerTokenPaid[0][_user] = rewardTokens[0].rewardPerTokenStored;
+            tokenRewards[activeRewards.at(i)][_user] = earned(
+                _user,
+                activeRewards.at(i)
+            );
+
+            userRewardsPerTokenPaid[activeRewards.at(i)][_user] = rewardTokens[
+                activeRewards.at(i)
+            ].rewardPerTokenStored;
+
+            if(i != activeRewards.length() - 1) lastUpdateTime = _lastUpdateTime;
+        }
         _;
     }
 }
