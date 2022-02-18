@@ -129,7 +129,6 @@ contract PeraWeightedStakingMulRews is Ownable {
 
     // Claims users rewards externally or by the other functions before reorganizations
     function claimReward() external updateReward(msg.sender) {
-        //console.log(activeRewards.length());
         for (uint256 i = 0; i < activeRewards.length(); i++) {
             uint256 _reward = tokenRewards[activeRewards.at(i)][msg.sender];
             if (_reward > 0) {
@@ -218,10 +217,12 @@ contract PeraWeightedStakingMulRews is Ownable {
             deadline = block.timestamp;
         }
 
-        // TODO: implement for different decimal possiblities
+        uint256 time;
+        (deadline > lastUpdateTime) ? time = deadline - lastUpdateTime : time = 0;
+
         return
             rewardTokens[_rewardTokenIndex].rewardPerTokenStored +
-            (((deadline - lastUpdateTime) *
+            ((time *
                 rewardTokens[_rewardTokenIndex].rewardRate *
                 10**rewardTokens[_rewardTokenIndex].decimals) / wTotalStaked);
     }

@@ -52,10 +52,6 @@ describe("Weighted Mul Rew Stakng Test", function () {
         await Staking.connect(owner).depositRewardTokens("0", STAKE_POOL);
         
         await OthToken.connect(owner).approve(Staking.address, ethers.constants.MaxUint256);
-        await OthToken.connect(addr1).approve(Staking.address, ethers.constants.MaxUint256);
-        await OthToken.connect(addr2).approve(Staking.address, ethers.constants.MaxUint256);
-        await OthToken.connect(owner).transfer(addr1.address, DISTR_AMOUNT);
-        await OthToken.connect(owner).transfer(addr2.address, DISTR_AMOUNT);
     });
 
     it("Deploys contracts", async function () {
@@ -132,26 +128,21 @@ describe("Weighted Mul Rew Stakng Test", function () {
 
         it("Adds a new token reward", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 20]);
-            await Staking.connect(owner).addNewRewardToken(OthToken.address, ethers.utils.parseUnits("50", 18), (initialTimestamp + 25), "18");
-            await Staking.connect(owner).depositRewardTokens("1", ethers.utils.parseUnits("250", 18));
+            await Staking.connect(owner).addNewRewardToken(OthToken.address, ethers.utils.parseUnits("35", 18), (initialTimestamp + 25), "18");
+            await Staking.connect(owner).depositRewardTokens("1", ethers.utils.parseUnits("175", 18));
             await provider.send('evm_mine');
-            expect(ethToNumber(await OthToken.balanceOf(Staking.address))).to.be.equal(ethToNumber(ethers.utils.parseUnits("250", 18)));
+            expect(ethToNumber(await OthToken.balanceOf(Staking.address))).to.be.equal(ethToNumber(ethers.utils.parseUnits("175", 18)));
         });
 
         it("Claims with new tokens", async function () {
-            console.log(ethToNumber(await OthToken.balanceOf(addr1.address)));
-            console.log(ethToNumber(await OthToken.balanceOf(addr2.address)));
-
-            await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 22]);
+            await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 27]);
             await Staking.connect(addr1).claimReward();     
             await Staking.connect(addr2).claimReward();    
             await provider.send('evm_mine');
+                        
+            expect(ethToNumber(await OthToken.balanceOf(addr1.address))).to.be.equal(100);
+            expect(ethToNumber(await OthToken.balanceOf(addr2.address))).to.be.equal(75);
 
-            // expect(ethToNumber(await Pera.balanceOf(addr1.address))).to.be.equal(userBalances[0] + 800);
-            // expect(ethToNumber(await Pera.balanceOf(addr2.address))).to.be.equal(userBalances[1] + 600);
-
-            console.log(ethToNumber(await OthToken.balanceOf(addr1.address)));
-            console.log(ethToNumber(await OthToken.balanceOf(addr2.address)));
 
         });
     });
