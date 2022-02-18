@@ -31,6 +31,8 @@ contract PeraWeightedStakingMulRews is Ownable {
     // Total weighted staking amount of the users
     uint256 public wTotalStaked;
 
+    bool public isStakeOpen;
+
     mapping(address => uint256) public userStaked; // _balances
 
     // Users staking coefficient
@@ -48,12 +50,17 @@ contract PeraWeightedStakingMulRews is Ownable {
     event Withdraw(address _user, uint256 _amount);
     event Claimed(address _user);
     event NewReward(address _tokenAddress, uint256 _id);
+    event StakeStatusChanged(bool _newStatus);
 
     constructor(
         address _peraAddress,
         address _punishmentAddress,
         uint256 _rewardRate
     ) {
+        require(
+            _peraAddress != address(0),
+            "Token address can not be 0 address."
+        );
         RewardTokensInfo memory info = RewardTokensInfo(
             IERC20(_peraAddress),
             _rewardRate,
@@ -69,6 +76,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     // Starts users stake positions
     function initialStake(uint256 _amount, uint256 _time)
         external
+        stakeOpen
         updateReward(msg.sender)
     {
         require(userUnlockingTime[msg.sender] == 0, "Initial stake found!");
@@ -85,6 +93,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     // Edits users stake positions and allow if it's possible
     function additionalStake(uint256 _amount)
         external
+        stakeOpen
         updateReward(msg.sender)
     {
         require(userUnlockingTime[msg.sender] != 0, "Initial stake not found!");
@@ -95,7 +104,11 @@ contract PeraWeightedStakingMulRews is Ownable {
     }
 
     // Unstakes users tokens if the staking period is over or punishes users
-    function withdraw(uint256 _amount) external updateReward(msg.sender) {
+    function withdraw(uint256 _amount)
+        external
+        stakeOpen /** TODO: Should we limit withdrawing when we stop staking */
+        updateReward(msg.sender)
+    {
         require(
             userStaked[msg.sender] >= _amount && _amount > 0,
             "Insufficient withdraw amount."
@@ -148,6 +161,10 @@ contract PeraWeightedStakingMulRews is Ownable {
         uint256 _deadline,
         uint8 _decimals
     ) external onlyOwner updateReward(address(0)) {
+        require(
+            _tokenAddress != address(0),
+            "Token address can not be 0 address."
+        );
         RewardTokensInfo memory info = RewardTokensInfo(
             IERC20(_tokenAddress),
             _rewardRate,
@@ -186,6 +203,11 @@ contract PeraWeightedStakingMulRews is Ownable {
         );
     }
 
+    function changeStakeStatus() external onlyOwner {
+        isStakeOpen = !isStakeOpen;
+        emit StakeStatusChanged(isStakeOpen);
+    }
+
     // This function returns staking coefficient in the base of 1000 (equals 1 coefficient)
     function calcWeight(uint256 _time) public pure returns (uint256) {
         // TODO: implement coefficient function on the base of 100
@@ -217,7 +239,9 @@ contract PeraWeightedStakingMulRews is Ownable {
         }
 
         uint256 time;
-        (deadline > lastUpdateTime) ? time = deadline - lastUpdateTime : time = 0;
+        (deadline > lastUpdateTime)
+            ? time = deadline - lastUpdateTime
+            : time = 0;
 
         return
             rewardTokens[_rewardTokenIndex].rewardPerTokenStored +
@@ -289,6 +313,11 @@ contract PeraWeightedStakingMulRews is Ownable {
             if (i != activeRewards.length() - 1)
                 lastUpdateTime = _lastUpdateTime;
         }
+        _;
+    }
+
+    modifier stakeOpen() {
+        require(isStakeOpen, "Not an active staking period.");
         _;
     }
 }

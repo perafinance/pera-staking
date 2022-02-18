@@ -14,5 +14,5 @@ artifacts
 #Private Info
 keys
 
-Syt*.sol
+contracts/*.txt
 TODO

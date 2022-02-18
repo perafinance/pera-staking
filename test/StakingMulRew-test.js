@@ -54,6 +54,8 @@ describe("Weighted Mul Rew Stakng Test", function () {
         
         await OthToken.connect(owner).approve(Staking.address, ethers.constants.MaxUint256);
         await MoreToken.connect(owner).approve(Staking.address, ethers.constants.MaxUint256);
+
+        await Staking.connect(owner).changeStakeStatus();
     });
 
     it("Deploys contracts", async function () {
