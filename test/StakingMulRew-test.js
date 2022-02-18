@@ -156,5 +156,16 @@ describe("Weighted Mul Rew Stakng Test", function () {
             expect(ethToNumber(await MoreToken.balanceOf(addr1.address))).to.be.equal(40);
             expect(ethToNumber(await MoreToken.balanceOf(addr2.address))).to.be.equal(30);
         });
+
+        it("Claims with new tokens again", async function () {
+            await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 30]);
+            await Staking.connect(addr1).claimReward();     
+            await Staking.connect(addr2).claimReward();
+            await provider.send('evm_mine');
+            expect(ethToNumber(await OthToken.balanceOf(addr1.address))).to.be.equal(100);
+            expect(ethToNumber(await OthToken.balanceOf(addr2.address))).to.be.equal(75);
+            expect(ethToNumber(await MoreToken.balanceOf(addr1.address))).to.be.equal(160);
+            expect(ethToNumber(await MoreToken.balanceOf(addr2.address))).to.be.equal(120);
+        });
     });
 });
