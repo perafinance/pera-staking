@@ -26,6 +26,9 @@ contract PeraWeightedStakingMulRews is Ownable {
     mapping(uint256 => mapping(address => uint256)) private tokenRewards;
     mapping(address => uint256) private stakedTimestamp;
 
+    // deadline to staking locks
+    uint256 private lockLimit; 
+
     uint256 public lastUpdateTime; //
 
     uint256 public totalStaked; // _totalSupply
@@ -57,7 +60,8 @@ contract PeraWeightedStakingMulRews is Ownable {
     constructor(
         address _peraAddress,
         address _punishmentAddress,
-        uint256 _rewardRate
+        uint256 _rewardRate,
+        uint256 _lockLimit
     ) {
         require(
             _peraAddress != address(0),
@@ -73,6 +77,7 @@ contract PeraWeightedStakingMulRews is Ownable {
         rewardTokens.push(info);
         activeRewards.add(rewardTokens.length - 1);
         punishmentAddress = _punishmentAddress;
+        lockLimit = _lockLimit;
     }
 
     // Starts users stake positions
@@ -84,6 +89,7 @@ contract PeraWeightedStakingMulRews is Ownable {
         require(userUnlockingTime[msg.sender] == 0, "Initial stake found!");
         require(_amount > 0, "Insufficient stake amount.");
         require(_time > 0, "Insufficient stake time.");
+        require(block.timestamp + _time < lockLimit, "Lock limit exceeded!");
 
         userWeights[msg.sender] = calcWeight(_time);
         userUnlockingTime[msg.sender] = block.timestamp + _time;
@@ -212,6 +218,10 @@ contract PeraWeightedStakingMulRews is Ownable {
         isStakeOpen = !isStakeOpen;
         emit StakeStatusChanged(isStakeOpen);
     }
+
+    function setLockLimit(uint256 _lockLimit) external onlyOwner {
+        lockLimit = _lockLimit;
+    }   
 
     // This function returns staking coefficient in the base of 1000 (equals 1 coefficient)
     function calcWeight(uint256 _time) public pure returns (uint256) {
