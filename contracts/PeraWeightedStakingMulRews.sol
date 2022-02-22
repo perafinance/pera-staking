@@ -24,6 +24,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     mapping(uint256 => mapping(address => uint256))
         private userRewardsPerTokenPaid;
     mapping(uint256 => mapping(address => uint256)) private tokenRewards;
+    mapping(address => uint256) private stakedTimestamp;
 
     uint256 public lastUpdateTime; //
 
@@ -32,6 +33,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     uint256 public wTotalStaked;
 
     bool public isStakeOpen;
+    // TODO: implement emergency mode: bool public isEmergency;
 
     mapping(address => uint256) public userStaked; // _balances
 
@@ -85,6 +87,7 @@ contract PeraWeightedStakingMulRews is Ownable {
 
         userWeights[msg.sender] = calcWeight(_time);
         userUnlockingTime[msg.sender] = block.timestamp + _time;
+        stakedTimestamp[msg.sender] = block.timestamp;
         wTotalStaked += (userWeights[msg.sender] * _amount);
         emit Staked(msg.sender, _amount, _time);
         _increase(_amount);
@@ -113,30 +116,32 @@ contract PeraWeightedStakingMulRews is Ownable {
             userStaked[msg.sender] >= _amount && _amount > 0,
             "Insufficient withdraw amount."
         );
-
+        uint256 _punishmentRate;
         // if staking time is over - free withdrawing
         if (block.timestamp >= userUnlockingTime[msg.sender]) {
-            if (userStaked[msg.sender] == _amount) {
-                wTotalStaked -= calcWeightedStake(msg.sender);
-                userWeights[msg.sender] = 0;
-                delete (userUnlockingTime[msg.sender]);
-            } else {
-                wTotalStaked -= userWeights[msg.sender] * _amount;
-                userWeights[msg.sender] -= userWeights[msg.sender] * _amount;
-            }
             emit Withdraw(msg.sender, _amount);
-            _decrease(_amount, 0);
             // early withdrawing with punishments
         } else {
-            // TODO: Implement unstaking with punishment - i made a mock version with 50% cut
-            uint256 _punishmentRate = 50;
+            _punishmentRate =
+                25 +
+                ((userUnlockingTime[msg.sender] - block.timestamp) * 50) /
+                (userUnlockingTime[msg.sender] - stakedTimestamp[msg.sender]);
             emit PunishedWithdraw(
                 msg.sender,
                 (_amount * _punishmentRate) / 100,
                 (_amount * (100 - _punishmentRate)) / 100
             );
-            _decrease(_amount, _punishmentRate);
         }
+        wTotalStaked -= userWeights[msg.sender] * _amount;
+        userWeights[msg.sender] -= userWeights[msg.sender] * _amount;
+
+        if (userStaked[msg.sender] == _amount) {
+            userWeights[msg.sender] = 0;
+            delete stakedTimestamp[msg.sender];
+            delete (userUnlockingTime[msg.sender]);
+        }
+
+        _decrease(_amount, _punishmentRate);
     }
 
     // Claims users rewards externally or by the other functions before reorganizations
