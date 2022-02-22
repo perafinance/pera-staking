@@ -41,8 +41,9 @@ contract PeraWeightedStakingMulRews is Ownable {
 
     // address where cutted tokens go
     address public punishmentAddress;
+
     bool public isStakeOpen;
-    // TODO: implement emergency mode: bool public isEmergency;
+    bool public isEmergencyOpen;
 
     event Staked(address _user, uint256 _amount, uint256 _time);
     event IncreaseStaked(address _user, uint256 _amount);
@@ -144,6 +145,18 @@ contract PeraWeightedStakingMulRews is Ownable {
         } 
 
         _decrease(_amount, _punishmentRate);
+    }
+
+    function emergencyWithdraw() external {
+        require(isEmergencyOpen, "Not an emergency status.");
+        require(
+            userData[msg.sender].userStaked > 0,
+            "No staked balance found ."
+        );
+
+        wTotalStaked -= uint256(userData[msg.sender].userWeights) * userData[msg.sender].userStaked;
+        delete(userData[msg.sender]);
+        _decrease(userData[msg.sender].userStaked, 0);
     }
 
     // Claims users rewards externally or by the other functions before reorganizations
