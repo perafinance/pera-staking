@@ -5,45 +5,65 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-contract PeraWeightedStakingMulRews is Ownable {
-    using SafeERC20 for IERC20;
+contract PeraStaking is Ownable {
+
+    /////////// Interfaces & Libraries ///////////
+    
+    // Using OpenZeppelin's EnumerableSet Util
     using EnumerableSet for EnumerableSet.UintSet;
+    // Using OpenZeppelin's SafeERC20 Util
+    using SafeERC20 for IERC20;
+
+    /////////// Structs ///////////
 
     struct TokenInfo {
-        IERC20 tokenInstance;
-        uint256 rewardRate;
+        IERC20 tokenInstance; // Token interface of tokens
+        uint256 rewardRate; // Distributing token count per second
         uint256 rewardPerTokenStored;
-        uint256 deadline;
-        uint8 decimals;
+        uint256 deadline; // Deadline of reward distributing
+        uint8 decimals; // Decimal count of token
     }
 
     struct UserInfo {
-        uint256 userStaked; // _balances
-        uint16 userWeights; // Users staking coefficient
-        uint48 stakedTimestamp; // Unlocking timestamp of the users
+        uint256 userStaked; // User staked balance
+        uint16 userWeights; // User staking coefficient
+        uint48 stakedTimestamp; // Staking timestamp of the users
         uint48 userUnlockingTime; // Unlocking timestamp of the users
     }
 
+    /////////// Type Declarations ///////////
+
+    // All historical reward token data
     TokenInfo[] private tokenList;
+    // List of actively distributing token data
     EnumerableSet.UintSet private activeRewards;
 
     // User Data
+    // User variables
     mapping(address => UserInfo) public userData;
+    // rewardPerTokenPaid data for each reward tokens
     mapping(uint256 => mapping(address => uint256)) private userRewardsPerTokenPaid;
+    // Reward data for each reward token
     mapping(uint256 => mapping(address => uint256)) private tokenRewards;
 
-    // deadline to staking locks
-    uint256 public lockLimit; 
-    uint256 public lastUpdateTime; //
-    uint256 public totalStaked; // _totalSupply
-    // Total weighted staking amount of the users
+    /////////// State Variables ///////////
+
+    // Deadline to locked stakings - after which date the token cannot be locked 
+    uint256 public lockLimit;
+    // Last stake operations
+    uint256 public lastUpdateTime;
+    // Total staked token amount
+    uint256 public totalStaked;
+    // Total weighted staked amount
     uint256 public wTotalStaked;
-
-    // address where cutted tokens go
+    // Cutted tokens destination address
     address public punishmentAddress;
-
+    // Staking - withdrawing availability 
     bool public isStakeOpen;
+    // Emergency withdraw availability
     bool public isEmergencyOpen;
+
+    /////////// Events ///////////
 
     event Staked(address _user, uint256 _amount, uint256 _time);
     event IncreaseStaked(address _user, uint256 _amount);
@@ -56,19 +76,22 @@ contract PeraWeightedStakingMulRews is Ownable {
     event Claimed(address _user);
     event NewReward(address _tokenAddress, uint256 _id);
     event StakeStatusChanged(bool _newStatus);
+    event EmergencyStatusChanged(bool _newStatus);
+
+    /////////// Functions ///////////
 
     constructor(
-        address _peraAddress,
+        address _mainTokenAddress,
         address _punishmentAddress,
         uint256 _rewardRate,
         uint256 _lockLimit
     ) {
         require(
-            _peraAddress != address(0),
+            _mainTokenAddress != address(0),
             "Token address can not be 0 address."
         );
         TokenInfo memory info = TokenInfo(
-            IERC20(_peraAddress),
+            IERC20(_mainTokenAddress),
             _rewardRate,
             0,
             0,
@@ -229,6 +252,11 @@ contract PeraWeightedStakingMulRews is Ownable {
         emit StakeStatusChanged(isStakeOpen);
     }
 
+    function changeEmergencyStatus() external onlyOwner {
+        isEmergencyOpen = !isEmergencyOpen;
+        emit EmergencyStatusChanged(isEmergencyOpen);
+    }
+
     function setLockLimit(uint256 _lockLimit) external onlyOwner {
         lockLimit = _lockLimit;
     }   
@@ -319,6 +347,8 @@ contract PeraWeightedStakingMulRews is Ownable {
         tokenList[0].tokenInstance.safeTransfer(msg.sender, _amount);
     }
 
+    /////////// Modifiers ///////////
+
     modifier updateReward(address _user) {
         for (uint256 i = 0; i < activeRewards.length(); i++) {
             uint256 _lastUpdateTime = lastUpdateTime;
@@ -341,7 +371,7 @@ contract PeraWeightedStakingMulRews is Ownable {
         _;
     }
 
-    modifier stakeOpen() {
+    modifier stakeOpen {
         require(isStakeOpen, "Not an active staking period.");
         _;
     }

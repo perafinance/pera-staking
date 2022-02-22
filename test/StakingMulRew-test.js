@@ -42,7 +42,7 @@ describe("Weighted Mul Rew Stakng Test", function () {
         OthToken = await Token.deploy();
         MoreToken = await Token.deploy();
 
-        PWStaking = await ethers.getContractFactory("PeraWeightedStakingMulRews");
+        PWStaking = await ethers.getContractFactory("PeraStaking");
         Staking = await PWStaking.deploy(Pera.address, punishment.address, ethers.utils.parseEther("100"), "999999999999999");
 
         await Pera.connect(owner).approve(Staking.address, ethers.constants.MaxUint256);
