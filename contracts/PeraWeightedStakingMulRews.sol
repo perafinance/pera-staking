@@ -18,10 +18,10 @@ contract PeraWeightedStakingMulRews is Ownable {
     }
 
     struct UserInfo {
-        uint16 userWeights; // Users staking coefficient
-        uint256 userUnlockingTime; // Unlocking timestamp of the users
-        uint256 stakedTimestamp; // Unlocking timestamp of the users
         uint256 userStaked; // _balances
+        uint16 userWeights; // Users staking coefficient
+        uint48 stakedTimestamp; // Unlocking timestamp of the users
+        uint48 userUnlockingTime; // Unlocking timestamp of the users
     }
 
     RewardTokensInfo[] private rewardTokens;
@@ -91,8 +91,8 @@ contract PeraWeightedStakingMulRews is Ownable {
         require(block.timestamp + _time < lockLimit, "Lock limit exceeded!");
 
         userData[msg.sender].userWeights = calcWeight(_time);
-        userData[msg.sender].userUnlockingTime = block.timestamp + _time;
-        userData[msg.sender].stakedTimestamp = block.timestamp;
+        userData[msg.sender].userUnlockingTime = uint48(block.timestamp + _time);
+        userData[msg.sender].stakedTimestamp = uint48(block.timestamp);
         wTotalStaked += (userData[msg.sender].userWeights * _amount);
         emit Staked(msg.sender, _amount, _time);
         _increase(_amount);
@@ -123,14 +123,14 @@ contract PeraWeightedStakingMulRews is Ownable {
         );
         uint256 _punishmentRate;
         // if staking time is over - free withdrawing
-        if (block.timestamp >= userData[msg.sender].userUnlockingTime) {
+        if (block.timestamp >= uint256(userData[msg.sender].userUnlockingTime)) {
             emit Withdraw(msg.sender, _amount);
             // early withdrawing with punishments
         } else {
             _punishmentRate =
                 25 +
-                ((userData[msg.sender].userUnlockingTime - block.timestamp) * 50) /
-                (userData[msg.sender].userUnlockingTime - userData[msg.sender].stakedTimestamp);
+                ((uint256(userData[msg.sender].userUnlockingTime) - block.timestamp) * 50) /
+                uint256(userData[msg.sender].userUnlockingTime - userData[msg.sender].stakedTimestamp);
             emit PunishedWithdraw(
                 msg.sender,
                 (_amount * _punishmentRate) / 100,
