@@ -91,7 +91,6 @@ contract PeraWeightedStaking is Ownable {
                 delete (userUnlockingTime[msg.sender]);
             } else {
                 wTotalStaked -= userWeights[msg.sender] * _amount;
-                userWeights[msg.sender] -= userWeights[msg.sender] * _amount;
             }
             emit Withdraw(msg.sender, _amount);
             _decrease(_amount, 0);

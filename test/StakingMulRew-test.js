@@ -92,9 +92,9 @@ describe("Weighted Mul Rew Stakng Test", function () {
             userWeights[0] = 200;
             wTotalStaked = 100*userWeights[0];
             expect(ethToNumber(await Pera.balanceOf(addr1.address))).to.be.equal(userBalances[0] - 100);
-            expect(ethToNumber(await Staking.userStaked(addr1.address))).to.be.equal(userTotalStaked[0]);
+            expect(ethToNumber((await Staking.userData(addr1.address)).userStaked)).to.be.equal(userTotalStaked[0]);
             expect(ethToNumber(await Staking.totalStaked())).to.be.equal(totalStaked);
-            expect(Number(await Staking.userWeights(addr1.address))).to.be.equal(userWeights[0]);
+            expect(Number((await Staking.userData(addr1.address)).userWeights)).to.be.equal(userWeights[0]);
             expect(ethToNumber(await Staking.wTotalStaked())).to.be.equal(wTotalStaked);
         });
 
@@ -116,9 +116,9 @@ describe("Weighted Mul Rew Stakng Test", function () {
             wTotalStaked += 100*userWeights[1];
             expect(ethToNumber(await Pera.balanceOf(addr1.address))).to.be.equal(userBalances[0] + 400);
             expect(ethToNumber(await Pera.balanceOf(addr2.address))).to.be.equal(userBalances[1] - 100);
-            expect(ethToNumber(await Staking.userStaked(addr2.address))).to.be.equal(userTotalStaked[1]);
+            expect(ethToNumber((await Staking.userData(addr2.address)).userStaked)).to.be.equal(userTotalStaked[1]);
             expect(ethToNumber(await Staking.totalStaked())).to.be.equal(totalStaked);
-            expect(Number(await Staking.userWeights(addr2.address))).to.be.equal(userWeights[1]);
+            expect((await Staking.userData(addr2.address)).userWeights).to.be.equal(userWeights[1]);
             expect(ethToNumber(await Staking.wTotalStaked())).to.be.equal(wTotalStaked);
         });
 

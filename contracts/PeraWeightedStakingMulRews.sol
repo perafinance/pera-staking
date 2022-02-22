@@ -17,33 +17,32 @@ contract PeraWeightedStakingMulRews is Ownable {
         uint8 decimals;
     }
 
-    address public punishmentAddress;
+    struct UserInfo {
+        uint16 userWeights; // Users staking coefficient
+        uint256 userUnlockingTime; // Unlocking timestamp of the users
+        uint256 stakedTimestamp; // Unlocking timestamp of the users
+        uint256 userStaked; // _balances
+    }
 
-    RewardTokensInfo[] private rewardTokens; // TODO: can be removed and change by a mapping
+    RewardTokensInfo[] private rewardTokens;
     EnumerableSet.UintSet private activeRewards;
-    mapping(uint256 => mapping(address => uint256))
-        private userRewardsPerTokenPaid;
+
+    // User Data
+    mapping(address => UserInfo) public userData;
+    mapping(uint256 => mapping(address => uint256)) private userRewardsPerTokenPaid;
     mapping(uint256 => mapping(address => uint256)) private tokenRewards;
-    mapping(address => uint256) private stakedTimestamp;
 
     // deadline to staking locks
     uint256 private lockLimit; 
-
     uint256 public lastUpdateTime; //
-
     uint256 public totalStaked; // _totalSupply
     // Total weighted staking amount of the users
     uint256 public wTotalStaked;
 
+    // address where cutted tokens go
+    address public punishmentAddress;
     bool public isStakeOpen;
     // TODO: implement emergency mode: bool public isEmergency;
-
-    mapping(address => uint256) public userStaked; // _balances
-
-    // Users staking coefficient
-    mapping(address => uint256) public userWeights;
-    // Unlocking timestamp of the users
-    mapping(address => uint256) public userUnlockingTime;
 
     event Staked(address _user, uint256 _amount, uint256 _time);
     event IncreaseStaked(address _user, uint256 _amount);
@@ -86,15 +85,15 @@ contract PeraWeightedStakingMulRews is Ownable {
         stakeOpen
         updateReward(msg.sender)
     {
-        require(userUnlockingTime[msg.sender] == 0, "Initial stake found!");
+        require(userData[msg.sender].userUnlockingTime == 0, "Initial stake found!");
         require(_amount > 0, "Insufficient stake amount.");
         require(_time > 0, "Insufficient stake time.");
         require(block.timestamp + _time < lockLimit, "Lock limit exceeded!");
 
-        userWeights[msg.sender] = calcWeight(_time);
-        userUnlockingTime[msg.sender] = block.timestamp + _time;
-        stakedTimestamp[msg.sender] = block.timestamp;
-        wTotalStaked += (userWeights[msg.sender] * _amount);
+        userData[msg.sender].userWeights = calcWeight(_time);
+        userData[msg.sender].userUnlockingTime = block.timestamp + _time;
+        userData[msg.sender].stakedTimestamp = block.timestamp;
+        wTotalStaked += (userData[msg.sender].userWeights * _amount);
         emit Staked(msg.sender, _amount, _time);
         _increase(_amount);
     }
@@ -105,9 +104,9 @@ contract PeraWeightedStakingMulRews is Ownable {
         stakeOpen
         updateReward(msg.sender)
     {
-        require(userUnlockingTime[msg.sender] != 0, "Initial stake not found!");
+        require(userData[msg.sender].userUnlockingTime != 0, "Initial stake not found!");
         require(_amount > 0, "Insufficient stake amount.");
-        wTotalStaked += (userWeights[msg.sender] * _amount);
+        wTotalStaked += (userData[msg.sender].userWeights * _amount);
         emit IncreaseStaked(msg.sender, _amount);
         _increase(_amount);
     }
@@ -119,33 +118,30 @@ contract PeraWeightedStakingMulRews is Ownable {
         updateReward(msg.sender)
     {
         require(
-            userStaked[msg.sender] >= _amount && _amount > 0,
+            userData[msg.sender].userStaked >= _amount && _amount > 0,
             "Insufficient withdraw amount."
         );
         uint256 _punishmentRate;
         // if staking time is over - free withdrawing
-        if (block.timestamp >= userUnlockingTime[msg.sender]) {
+        if (block.timestamp >= userData[msg.sender].userUnlockingTime) {
             emit Withdraw(msg.sender, _amount);
             // early withdrawing with punishments
         } else {
             _punishmentRate =
                 25 +
-                ((userUnlockingTime[msg.sender] - block.timestamp) * 50) /
-                (userUnlockingTime[msg.sender] - stakedTimestamp[msg.sender]);
+                ((userData[msg.sender].userUnlockingTime - block.timestamp) * 50) /
+                (userData[msg.sender].userUnlockingTime - userData[msg.sender].stakedTimestamp);
             emit PunishedWithdraw(
                 msg.sender,
                 (_amount * _punishmentRate) / 100,
                 (_amount * (100 - _punishmentRate)) / 100
             );
         }
-        wTotalStaked -= userWeights[msg.sender] * _amount;
-        userWeights[msg.sender] -= userWeights[msg.sender] * _amount;
+        wTotalStaked -= uint256(userData[msg.sender].userWeights) * _amount;
 
-        if (userStaked[msg.sender] == _amount) {
-            userWeights[msg.sender] = 0;
-            delete stakedTimestamp[msg.sender];
-            delete (userUnlockingTime[msg.sender]);
-        }
+        if (userData[msg.sender].userStaked == _amount) {
+            delete(userData[msg.sender]);
+        } 
 
         _decrease(_amount, _punishmentRate);
     }
@@ -195,6 +191,7 @@ contract PeraWeightedStakingMulRews is Ownable {
             rewardTokens[_id].deadline < block.timestamp,
             "The distribution timeline has not over."
         );
+        require(_id != 0, "Can not delist main token.");
         require(activeRewards.remove(_id), "Delisting unsuccessful");
     }
 
@@ -224,7 +221,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     }   
 
     // This function returns staking coefficient in the base of 1000 (equals 1 coefficient)
-    function calcWeight(uint256 _time) public pure returns (uint256) {
+    function calcWeight(uint256 _time) public pure returns (uint16) {
         // TODO: implement coefficient function on the base of 100
         // 150 is returned as a mock variable aka coef: 1.5
 
@@ -237,7 +234,7 @@ contract PeraWeightedStakingMulRews is Ownable {
 
     // This function calculates users weighted stakin amounts
     function calcWeightedStake(address _user) public view returns (uint256) {
-        return (userWeights[_user] * userStaked[_user]);
+        return (userData[_user].userWeights * userData[_user].userStaked);
     }
 
     function rewardPerToken(uint256 _rewardTokenIndex)
@@ -286,7 +283,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     // Increses staking positions of the users - actually "stake" function of general contracts
     function _increase(uint256 _amount) private {
         totalStaked += _amount;
-        userStaked[msg.sender] += _amount;
+        userData[msg.sender].userStaked += _amount;
         rewardTokens[0].tokenInstance.safeTransferFrom(
             msg.sender,
             address(this),
@@ -297,7 +294,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     // Decreases staking positions of the users - actually "unstake/withdraw" function of general contracts
     function _decrease(uint256 _amount, uint256 _punishmentRate) private {
         totalStaked -= _amount;
-        userStaked[msg.sender] -= _amount;
+        userData[msg.sender].userStaked -= _amount;
         if (_punishmentRate > 0) {
             uint256 _punishment = (_amount * _punishmentRate) / 100;
             _amount = _amount - _punishment;
