@@ -9,7 +9,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
 
-    struct RewardTokensInfo {
+    struct TokenInfo {
         IERC20 tokenInstance;
         uint256 rewardRate;
         uint256 rewardPerTokenStored;
@@ -24,7 +24,7 @@ contract PeraWeightedStakingMulRews is Ownable {
         uint48 userUnlockingTime; // Unlocking timestamp of the users
     }
 
-    RewardTokensInfo[] private rewardTokens;
+    TokenInfo[] private tokenList;
     EnumerableSet.UintSet private activeRewards;
 
     // User Data
@@ -33,7 +33,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     mapping(uint256 => mapping(address => uint256)) private tokenRewards;
 
     // deadline to staking locks
-    uint256 private lockLimit; 
+    uint256 public lockLimit; 
     uint256 public lastUpdateTime; //
     uint256 public totalStaked; // _totalSupply
     // Total weighted staking amount of the users
@@ -67,15 +67,15 @@ contract PeraWeightedStakingMulRews is Ownable {
             _peraAddress != address(0),
             "Token address can not be 0 address."
         );
-        RewardTokensInfo memory info = RewardTokensInfo(
+        TokenInfo memory info = TokenInfo(
             IERC20(_peraAddress),
             _rewardRate,
             0,
             0,
             18
         );
-        rewardTokens.push(info);
-        activeRewards.add(rewardTokens.length - 1);
+        tokenList.push(info);
+        activeRewards.add(tokenList.length - 1);
         punishmentAddress = _punishmentAddress;
         lockLimit = _lockLimit;
     }
@@ -165,7 +165,7 @@ contract PeraWeightedStakingMulRews is Ownable {
             uint256 _reward = tokenRewards[activeRewards.at(i)][msg.sender];
             if (_reward > 0) {
                 tokenRewards[activeRewards.at(i)][msg.sender] = 0;
-                rewardTokens[activeRewards.at(i)].tokenInstance.safeTransfer(
+                tokenList[activeRewards.at(i)].tokenInstance.safeTransfer(
                     msg.sender,
                     _reward
                 );
@@ -185,7 +185,7 @@ contract PeraWeightedStakingMulRews is Ownable {
             _tokenAddress != address(0),
             "Token address can not be 0 address."
         );
-        RewardTokensInfo memory info = RewardTokensInfo(
+        TokenInfo memory info = TokenInfo(
             IERC20(_tokenAddress),
             _rewardRate,
             0,
@@ -193,15 +193,15 @@ contract PeraWeightedStakingMulRews is Ownable {
             _decimals
         );
 
-        rewardTokens.push(info);
-        activeRewards.add(rewardTokens.length - 1);
+        tokenList.push(info);
+        activeRewards.add(tokenList.length - 1);
 
-        emit NewReward(_tokenAddress, rewardTokens.length - 1);
+        emit NewReward(_tokenAddress, tokenList.length - 1);
     }
 
     function delistRewardToken(uint256 _id) external onlyOwner {
         require(
-            rewardTokens[_id].deadline < block.timestamp,
+            tokenList[_id].deadline < block.timestamp,
             "The distribution timeline has not over."
         );
         require(_id != 0, "Can not delist main token.");
@@ -217,7 +217,7 @@ contract PeraWeightedStakingMulRews is Ownable {
             "Not an active reward distribution."
         );
 
-        rewardTokens[_id].tokenInstance.safeTransferFrom(
+        tokenList[_id].tokenInstance.safeTransferFrom(
             msg.sender,
             address(this),
             _amount
@@ -257,7 +257,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     {
         if (wTotalStaked == 0) return 0;
 
-        uint256 deadline = rewardTokens[_rewardTokenIndex].deadline;
+        uint256 deadline = tokenList[_rewardTokenIndex].deadline;
 
         if (deadline == 0 || block.timestamp < deadline) {
             deadline = block.timestamp;
@@ -269,10 +269,10 @@ contract PeraWeightedStakingMulRews is Ownable {
             : time = 0;
 
         return
-            rewardTokens[_rewardTokenIndex].rewardPerTokenStored +
+            tokenList[_rewardTokenIndex].rewardPerTokenStored +
             ((time *
-                rewardTokens[_rewardTokenIndex].rewardRate *
-                10**rewardTokens[_rewardTokenIndex].decimals) / wTotalStaked);
+                tokenList[_rewardTokenIndex].rewardRate *
+                10**tokenList[_rewardTokenIndex].decimals) / wTotalStaked);
     }
 
     function earned(address _user, uint256 _rewardTokenIndex)
@@ -284,7 +284,7 @@ contract PeraWeightedStakingMulRews is Ownable {
             ((calcWeightedStake(_user) *
                 (rewardPerToken(_rewardTokenIndex) -
                     userRewardsPerTokenPaid[_rewardTokenIndex][_user])) /
-                10**rewardTokens[_rewardTokenIndex].decimals) +
+                10**tokenList[_rewardTokenIndex].decimals) +
             tokenRewards[_rewardTokenIndex][_user];
     }
 
@@ -297,7 +297,7 @@ contract PeraWeightedStakingMulRews is Ownable {
     function _increase(uint256 _amount) private {
         totalStaked += _amount;
         userData[msg.sender].userStaked += _amount;
-        rewardTokens[0].tokenInstance.safeTransferFrom(
+        tokenList[0].tokenInstance.safeTransferFrom(
             msg.sender,
             address(this),
             _amount
@@ -311,18 +311,18 @@ contract PeraWeightedStakingMulRews is Ownable {
         if (_punishmentRate > 0) {
             uint256 _punishment = (_amount * _punishmentRate) / 100;
             _amount = _amount - _punishment;
-            rewardTokens[0].tokenInstance.safeTransfer(
+            tokenList[0].tokenInstance.safeTransfer(
                 punishmentAddress,
                 _punishment
             );
         }
-        rewardTokens[0].tokenInstance.safeTransfer(msg.sender, _amount);
+        tokenList[0].tokenInstance.safeTransfer(msg.sender, _amount);
     }
 
     modifier updateReward(address _user) {
         for (uint256 i = 0; i < activeRewards.length(); i++) {
             uint256 _lastUpdateTime = lastUpdateTime;
-            rewardTokens[activeRewards.at(i)]
+            tokenList[activeRewards.at(i)]
                 .rewardPerTokenStored = rewardPerToken(activeRewards.at(i));
             lastUpdateTime = block.timestamp;
 
@@ -333,7 +333,7 @@ contract PeraWeightedStakingMulRews is Ownable {
                 );
                 userRewardsPerTokenPaid[activeRewards.at(i)][
                     _user
-                ] = rewardTokens[activeRewards.at(i)].rewardPerTokenStored;
+                ] = tokenList[activeRewards.at(i)].rewardPerTokenStored;
             }
             if (i != activeRewards.length() - 1)
                 lastUpdateTime = _lastUpdateTime;
