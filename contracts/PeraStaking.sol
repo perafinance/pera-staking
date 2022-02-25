@@ -6,9 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract PeraStaking is Ownable {
-
     /////////// Interfaces & Libraries ///////////
-    
+
     // Using OpenZeppelin's EnumerableSet Util
     using EnumerableSet for EnumerableSet.UintSet;
     // Using OpenZeppelin's SafeERC20 Util
@@ -42,13 +41,14 @@ contract PeraStaking is Ownable {
     // User variables
     mapping(address => UserInfo) public userData;
     // rewardPerTokenPaid data for each reward tokens
-    mapping(uint256 => mapping(address => uint256)) private userRewardsPerTokenPaid;
+    mapping(uint256 => mapping(address => uint256))
+        private userRewardsPerTokenPaid;
     // Reward data for each reward token
     mapping(uint256 => mapping(address => uint256)) private tokenRewards;
 
     /////////// State Variables ///////////
 
-    // Deadline to locked stakings - after which date the token cannot be locked 
+    // Deadline to locked stakings - after which date the token cannot be locked
     uint256 public lockLimit;
     // Last stake operations
     uint256 public lastUpdateTime;
@@ -58,7 +58,7 @@ contract PeraStaking is Ownable {
     uint256 public wTotalStaked;
     // Cutted tokens destination address
     address public punishmentAddress;
-    // Staking - withdrawing availability 
+    // Staking - withdrawing availability
     bool public isStakeOpen;
     // Emergency withdraw availability
     bool public isEmergencyOpen;
@@ -109,13 +109,18 @@ contract PeraStaking is Ownable {
         stakeOpen
         updateReward(msg.sender)
     {
-        require(userData[msg.sender].userUnlockingTime == 0, "Initial stake found!");
+        require(
+            userData[msg.sender].userUnlockingTime == 0,
+            "Initial stake found!"
+        );
         require(_amount > 0, "Insufficient stake amount.");
         require(_time > 0, "Insufficient stake time.");
         require(block.timestamp + _time < lockLimit, "Lock limit exceeded!");
 
         userData[msg.sender].userWeights = calcWeight(_time);
-        userData[msg.sender].userUnlockingTime = uint48(block.timestamp + _time);
+        userData[msg.sender].userUnlockingTime = uint48(
+            block.timestamp + _time
+        );
         userData[msg.sender].stakedTimestamp = uint48(block.timestamp);
         wTotalStaked += (userData[msg.sender].userWeights * _amount);
         emit Staked(msg.sender, _amount, _time);
@@ -128,9 +133,20 @@ contract PeraStaking is Ownable {
         stakeOpen
         updateReward(msg.sender)
     {
-        require(userData[msg.sender].userUnlockingTime != 0, "Initial stake not found!");
+        require(
+            userData[msg.sender].userUnlockingTime != 0,
+            "Initial stake not found!"
+        );
         require(_amount > 0, "Insufficient stake amount.");
-        wTotalStaked += (userData[msg.sender].userWeights * _amount);
+        uint16 _additionWeight = calcWeight(
+            uint256(userData[msg.sender].userUnlockingTime) - block.timestamp
+        );
+        userData[msg.sender].userWeights = uint16(
+            (calcWeightedStake(msg.sender) +
+                (_amount * uint256(_additionWeight))) /
+                (userData[msg.sender].userStaked + _amount)
+        );
+        wTotalStaked += uint256(_additionWeight) * _amount;
         emit IncreaseStaked(msg.sender, _amount);
         _increase(_amount);
     }
@@ -147,14 +163,20 @@ contract PeraStaking is Ownable {
         );
         uint256 _punishmentRate;
         // if staking time is over - free withdrawing
-        if (block.timestamp >= uint256(userData[msg.sender].userUnlockingTime)) {
+        if (
+            block.timestamp >= uint256(userData[msg.sender].userUnlockingTime)
+        ) {
             emit Withdraw(msg.sender, _amount);
             // early withdrawing with punishments
         } else {
             _punishmentRate =
                 25 +
-                ((uint256(userData[msg.sender].userUnlockingTime) - block.timestamp) * 50) /
-                uint256(userData[msg.sender].userUnlockingTime - userData[msg.sender].stakedTimestamp);
+                ((uint256(userData[msg.sender].userUnlockingTime) -
+                    block.timestamp) * 50) /
+                uint256(
+                    userData[msg.sender].userUnlockingTime -
+                        userData[msg.sender].stakedTimestamp
+                );
             emit PunishedWithdraw(
                 msg.sender,
                 (_amount * _punishmentRate) / 100,
@@ -164,8 +186,8 @@ contract PeraStaking is Ownable {
         wTotalStaked -= uint256(userData[msg.sender].userWeights) * _amount;
 
         if (userData[msg.sender].userStaked == _amount) {
-            delete(userData[msg.sender]);
-        } 
+            delete (userData[msg.sender]);
+        }
 
         _decrease(_amount, _punishmentRate);
     }
@@ -177,8 +199,10 @@ contract PeraStaking is Ownable {
             "No staked balance found ."
         );
 
-        wTotalStaked -= uint256(userData[msg.sender].userWeights) * userData[msg.sender].userStaked;
-        delete(userData[msg.sender]);
+        wTotalStaked -=
+            uint256(userData[msg.sender].userWeights) *
+            userData[msg.sender].userStaked;
+        delete (userData[msg.sender]);
         _decrease(userData[msg.sender].userStaked, 0);
     }
 
@@ -259,7 +283,7 @@ contract PeraStaking is Ownable {
 
     function setLockLimit(uint256 _lockLimit) external onlyOwner {
         lockLimit = _lockLimit;
-    }   
+    }
 
     // This function returns staking coefficient in the base of 1000 (equals 1 coefficient)
     function calcWeight(uint256 _time) public pure returns (uint16) {
@@ -361,9 +385,9 @@ contract PeraStaking is Ownable {
                     _user,
                     activeRewards.at(i)
                 );
-                userRewardsPerTokenPaid[activeRewards.at(i)][
-                    _user
-                ] = tokenList[activeRewards.at(i)].rewardPerTokenStored;
+                userRewardsPerTokenPaid[activeRewards.at(i)][_user] = tokenList[
+                    activeRewards.at(i)
+                ].rewardPerTokenStored;
             }
             if (i != activeRewards.length() - 1)
                 lastUpdateTime = _lastUpdateTime;
@@ -371,7 +395,7 @@ contract PeraStaking is Ownable {
         _;
     }
 
-    modifier stakeOpen {
+    modifier stakeOpen() {
         require(isStakeOpen, "Not an active staking period.");
         _;
     }
