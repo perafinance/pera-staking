@@ -154,7 +154,6 @@ contract PeraStaking is Ownable {
     // Unstakes users tokens if the staking period is over or punishes users
     function withdraw(uint256 _amount)
         external
-        stakeOpen /** TODO: Should we limit withdrawing when we stop staking */
         updateReward(msg.sender)
     {
         require(
