@@ -160,7 +160,7 @@ contract PeraStaking is Ownable {
             userData[msg.sender].userStaked >= _amount && _amount > 0,
             "Insufficient withdraw amount."
         );
-        uint256 _punishmentRate;
+        uint256 _punishmentRate = 0;
         // if staking time is over - free withdrawing
         if (
             block.timestamp >= uint256(userData[msg.sender].userUnlockingTime)
@@ -268,6 +268,12 @@ contract PeraStaking is Ownable {
             address(this),
             _amount
         );
+    }
+
+    function changeDeadline(uint256 _id, uint256 _time) updateReward(address(0)) external onlyOwner {
+        require(_time >= block.timestamp || _time == 0, "Inappropriate timestamp.");
+        require(tokenList[_id].deadline > block.timestamp, "The distribution has over.");
+        tokenList[_id].deadline = _time;
     }
 
     function changeStakeStatus() external onlyOwner {
