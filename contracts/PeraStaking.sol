@@ -152,10 +152,7 @@ contract PeraStaking is Ownable {
     }
 
     // Unstakes users tokens if the staking period is over or punishes users
-    function withdraw(uint256 _amount)
-        external
-        updateReward(msg.sender)
-    {
+    function withdraw(uint256 _amount) external updateReward(msg.sender) {
         require(
             userData[msg.sender].userStaked >= _amount && _amount > 0,
             "Insufficient withdraw amount."
@@ -270,9 +267,19 @@ contract PeraStaking is Ownable {
         );
     }
 
-    function changeDeadline(uint256 _id, uint256 _time) updateReward(address(0)) external onlyOwner {
-        require(_time >= block.timestamp || _time == 0, "Inappropriate timestamp.");
-        require(tokenList[_id].deadline > block.timestamp, "The distribution has over.");
+    function changeDeadline(uint256 _id, uint256 _time)
+        external
+        updateReward(address(0))
+        onlyOwner
+    {
+        require(
+            _time >= block.timestamp || _time == 0,
+            "Inappropriate timestamp."
+        );
+        require(
+            tokenList[_id].deadline > block.timestamp,
+            "The distribution has over."
+        );
         tokenList[_id].deadline = _time;
     }
 
@@ -290,15 +297,15 @@ contract PeraStaking is Ownable {
         lockLimit = _lockLimit;
     }
 
-    // This function returns staking coefficient in the base of 1000 (equals 1 coefficient)
+    // This function returns staking coefficient in the base of 100 (equals 1 coefficient)
     function calcWeight(uint256 _time) public pure returns (uint16) {
-        // TODO: implement coefficient function on the base of 100
-        // 150 is returned as a mock variable aka coef: 1.5
-
-        if ((_time / 1 weeks) < 12) {
-            return 150;
-        } else {
+        uint256 _stakingDays = _time / 1 days;
+        if (_stakingDays <= 90) {
+            return 100;
+        } else if (_stakingDays >= 365) {
             return 200;
+        } else {
+            return uint16((((_stakingDays - 90)**2) / (275**2) + 1) * 100);
         }
     }
 
