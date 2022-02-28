@@ -100,14 +100,14 @@ describe("Weighted Mul Rew Stakng Test", function () {
 
         it("Gets rewards", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 6]);
-            await Staking.connect(addr1).claimReward();
+            await Staking.connect(addr1).claimAllRewards();
             await provider.send('evm_mine');
             expect(ethToNumber(await Pera.balanceOf(addr1.address))).to.be.equal(userBalances[0] + 500);
         });
 
         it("Gets rewards again, and new staker", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 10]);
-            await Staking.connect(addr1).claimReward();     
+            await Staking.connect(addr1).claimAllRewards();     
             await Staking.connect(addr2).initialStake(ethers.utils.parseEther("100"), weekToSecs(4));
             await provider.send('evm_mine');
             userTotalStaked[1] = 100;
@@ -124,8 +124,8 @@ describe("Weighted Mul Rew Stakng Test", function () {
 
         it("Calculates rewards for same passing time", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 17]);
-            await Staking.connect(addr1).claimReward();     
-            await Staking.connect(addr2).claimReward();     
+            await Staking.connect(addr1).claimAllRewards();     
+            await Staking.connect(addr2).claimAllRewards();     
             await provider.send('evm_mine');
             expect(ethToNumber(await Pera.balanceOf(addr1.address))).to.be.equal(userBalances[0] + 400);
             expect(ethToNumber(await Pera.balanceOf(addr2.address))).to.be.equal(userBalances[1] + 300);
@@ -149,8 +149,8 @@ describe("Weighted Mul Rew Stakng Test", function () {
 
         it("Claims with new tokens", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 27]);
-            await Staking.connect(addr1).claimReward();     
-            await Staking.connect(addr2).claimReward();    
+            await Staking.connect(addr1).claimAllRewards();     
+            await Staking.connect(addr2).claimAllRewards();    
             await provider.send('evm_mine');
 
             expect(ethToNumber(await OthToken.balanceOf(addr1.address))).to.be.equal(100);
@@ -161,8 +161,11 @@ describe("Weighted Mul Rew Stakng Test", function () {
 
         it("Claims with new tokens again", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 30]);
-            await Staking.connect(addr1).claimReward();     
-            await Staking.connect(addr2).claimReward();
+            // await Staking.connect(addr1).claimSingleReward("0");
+            // await Staking.connect(addr1).claimSingleReward("1");
+            // await Staking.connect(addr1).claimSingleReward("2");
+            await Staking.connect(addr1).claimAllRewards();     
+            await Staking.connect(addr2).claimAllRewards();
             await provider.send('evm_mine');
             expect(ethToNumber(await OthToken.balanceOf(addr1.address))).to.be.equal(100);
             expect(ethToNumber(await OthToken.balanceOf(addr2.address))).to.be.equal(75);

@@ -207,7 +207,7 @@ contract PeraStaking is Ownable {
     }
 
     // Claims users rewards externally or by the other functions before reorganizations
-    function claimReward() external updateReward(msg.sender) {
+    function claimAllRewards() external updateReward(msg.sender) {
         for (uint256 i = 0; i < activeRewards.length(); i++) {
             uint256 _reward = tokenRewards[activeRewards.at(i)][msg.sender];
             if (_reward > 0) {
@@ -218,6 +218,19 @@ contract PeraStaking is Ownable {
                 );
             }
         }
+
+        emit Claimed(msg.sender);
+    }
+
+    function claimSingleReward(uint256 _id) external updateReward(msg.sender) {
+            uint256 _reward = tokenRewards[_id][msg.sender];
+            if (_reward > 0) {
+                tokenRewards[_id][msg.sender] = 0;
+                tokenList[_id].tokenInstance.safeTransfer(
+                    msg.sender,
+                    _reward
+                );
+            }
 
         emit Claimed(msg.sender);
     }
