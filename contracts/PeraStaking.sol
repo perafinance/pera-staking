@@ -90,6 +90,10 @@ contract PeraStaking is Ownable {
             _mainTokenAddress != address(0),
             "Token address can not be 0 address."
         );
+        require(
+            _punishmentAddress != address(0),
+            "Receiver address can not be 0 address."
+        );
         TokenInfo memory info = TokenInfo(
             IERC20(_mainTokenAddress),
             _rewardRate,
@@ -295,6 +299,14 @@ contract PeraStaking is Ownable {
 
     function setLockLimit(uint256 _lockLimit) external onlyOwner {
         lockLimit = _lockLimit;
+    }
+
+    function changePunishmentAddress(address _newAddress) external onlyOwner {
+        require(
+            _newAddress != address(0),
+            "Receiver address can not be 0 address."
+        );
+        punishmentAddress = _newAddress;
     }
 
     // This function returns staking coefficient in the base of 100 (equals 1 coefficient)
