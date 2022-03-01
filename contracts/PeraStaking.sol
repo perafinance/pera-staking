@@ -223,14 +223,11 @@ contract PeraStaking is Ownable {
     }
 
     function claimSingleReward(uint256 _id) external updateReward(msg.sender) {
-            uint256 _reward = tokenRewards[_id][msg.sender];
-            if (_reward > 0) {
-                tokenRewards[_id][msg.sender] = 0;
-                tokenList[_id].tokenInstance.safeTransfer(
-                    msg.sender,
-                    _reward
-                );
-            }
+        uint256 _reward = tokenRewards[_id][msg.sender];
+        if (_reward > 0) {
+            tokenRewards[_id][msg.sender] = 0;
+            tokenList[_id].tokenInstance.safeTransfer(msg.sender, _reward);
+        }
 
         emit Claimed(msg.sender);
     }
@@ -330,7 +327,7 @@ contract PeraStaking is Ownable {
         } else if (_stakingDays >= 365) {
             return 200;
         } else {
-            return uint16((((_stakingDays - 90)**2) / (275**2) + 1) * 100);
+            return uint16(((100 * (_stakingDays - 90)**2) / 75625) + 100);
         }
     }
 

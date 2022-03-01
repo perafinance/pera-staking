@@ -85,7 +85,7 @@ describe("Weighted Mul Rew Stakng Test", function () {
             await network.provider.send("evm_setAutomine", [false]);
             initialTimestamp = await getBlockTimestamp();
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp+1]);
-            await Staking.connect(addr1).initialStake(ethers.utils.parseEther("100"), weekToSecs(52));
+            await Staking.connect(addr1).initialStake(ethers.utils.parseEther("100"), weekToSecs(60));
             await provider.send('evm_mine');
             userTotalStaked[0] = 100;
             totalStaked = 100;
@@ -108,11 +108,11 @@ describe("Weighted Mul Rew Stakng Test", function () {
         it("Gets rewards again, and new staker", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 10]);
             await Staking.connect(addr1).claimAllRewards();     
-            await Staking.connect(addr2).initialStake(ethers.utils.parseEther("100"), weekToSecs(4));
+            await Staking.connect(addr2).initialStake(ethers.utils.parseEther("100"), weekToSecs(12));
             await provider.send('evm_mine');
             userTotalStaked[1] = 100;
             totalStaked += 100;
-            userWeights[1] = 150;
+            userWeights[1] = 100;
             wTotalStaked += 100*userWeights[1];
             expect(ethToNumber(await Pera.balanceOf(addr1.address))).to.be.equal(userBalances[0] + 400);
             expect(ethToNumber(await Pera.balanceOf(addr2.address))).to.be.equal(userBalances[1] - 100);
