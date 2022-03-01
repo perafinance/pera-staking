@@ -323,11 +323,11 @@ contract PeraStaking is Ownable {
     function calcWeight(uint256 _time) public pure returns (uint16) {
         uint256 _stakingDays = _time / 1 days;
         if (_stakingDays <= 90) {
-            return 100;
+            return 1000;
         } else if (_stakingDays >= 365) {
-            return 200;
+            return 2000;
         } else {
-            return uint16(((100 * (_stakingDays - 90)**2) / 75625) + 100);
+            return uint16(((1000 * (_stakingDays - 90)**2) / 75625) + 1000);
         }
     }
 
