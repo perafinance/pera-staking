@@ -289,6 +289,10 @@ contract PeraStaking is Ownable {
         );
     }
 
+    function withdrawTokens(address _tokenAddress, uint256 _amount) external onlyOwner {
+        IERC20(_tokenAddress).safeTransfer(msg.sender, _amount);
+    }
+
     function changeDeadline(uint256 _id, uint256 _time)
         external
         updateReward(address(0))
