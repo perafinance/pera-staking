@@ -107,6 +107,14 @@ contract PeraStaking is Ownable {
         lockLimit = _lockLimit;
     }
 
+    receive() external payable {
+        revert();
+    }
+
+    fallback() external  {
+        revert();
+    }
+
     // Starts users stake positions
     function initialStake(uint256 _amount, uint256 _time)
         external
