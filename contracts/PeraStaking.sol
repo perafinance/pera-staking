@@ -246,11 +246,6 @@ contract PeraStaking is Ownable {
         }
         wTotalStaked -= uint256(userData[msg.sender].userWeights) * _amount;
 
-        // Deleting staking position if there is no more balance
-        if (userData[msg.sender].userStaked == _amount) {
-            delete (userData[msg.sender]);
-        }
-
         // Manages internal stake amounts
         _decrease(_amount, _punishmentRate);
     }
@@ -272,7 +267,6 @@ contract PeraStaking is Ownable {
         wTotalStaked -=
             uint256(userData[msg.sender].userWeights) *
             userData[msg.sender].userStaked;
-        delete (userData[msg.sender]);
 
         // Manages internal stake amounts
         _decrease(userData[msg.sender].userStaked, 0);
@@ -358,7 +352,10 @@ contract PeraStaking is Ownable {
             "[delistRewardToken] The distribution timeline has not over."
         );
         require(_id != 0, "[delistRewardToken] Can not delist main token.");
-        require(activeRewards.remove(_id), "[delistRewardToken] Delisting unsuccessful");
+        require(
+            activeRewards.remove(_id),
+            "[delistRewardToken] Delisting unsuccessful"
+        );
     }
 
     /**
@@ -514,8 +511,13 @@ contract PeraStaking is Ownable {
 
     // Decreases staking positions of the users - actually "unstake/withdraw" function of general contracts
     function _decrease(uint256 _amount, uint256 _punishmentRate) private {
+        if(userData[msg.sender].userStaked == _amount) {
+            delete (userData[msg.sender]);
+        } else {
+            userData[msg.sender].userStaked -= _amount;
+        }
         totalStaked -= _amount;
-        userData[msg.sender].userStaked -= _amount;
+
         if (_punishmentRate > 0) {
             uint256 _punishment = (_amount * _punishmentRate) / 100;
             _amount = _amount - _punishment;
