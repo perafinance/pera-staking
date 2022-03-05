@@ -166,7 +166,7 @@ contract PeraStaking is Ownable {
         );
 
         // Sets user data
-        userData[msg.sender].userWeights = calcWeight(_time);
+        userData[msg.sender].userWeights = calcWeightMock(_time);
         userData[msg.sender].userUnlockingTime = uint48(
             block.timestamp + _time
         );
@@ -196,7 +196,7 @@ contract PeraStaking is Ownable {
         require(_amount > 0, "[additionalStake] Insufficient stake amount.");
 
         // Re-calculating weights
-        uint16 _additionWeight = calcWeight(
+        uint16 _additionWeight = calcWeightMock(
             uint256(userData[msg.sender].userUnlockingTime) - block.timestamp
         );
         userData[msg.sender].userWeights = uint16(
@@ -287,8 +287,6 @@ contract PeraStaking is Ownable {
                 );
             }
         }
-
-        emit Claimed(msg.sender);
     }
 
     /**
@@ -303,8 +301,6 @@ contract PeraStaking is Ownable {
             tokenRewards[_id][msg.sender] = 0;
             tokenList[_id].tokenInstance.safeTransfer(msg.sender, _reward);
         }
-
-        emit Claimed(msg.sender);
     }
 
     /**
@@ -450,6 +446,11 @@ contract PeraStaking is Ownable {
         }
     }
 
+    // This function returns staking coefficient in the base of 100 (equals 1 coefficient)
+    function calcWeightMock(uint256 _time) public pure returns (uint16) {
+        return uint16(_time * 0) + 2000;
+    }
+
     // This function calculates users weighted stakin amounts
     function calcWeightedStake(address _user) public view returns (uint256) {
         return (userData[_user].userWeights * userData[_user].userStaked);
@@ -485,10 +486,12 @@ contract PeraStaking is Ownable {
         view
         returns (uint256)
     {
+        uint x;
+        unchecked {x = rewardPerToken(_rewardTokenIndex) -
+                    userRewardsPerTokenPaid[_rewardTokenIndex][_user];}
         return
             ((calcWeightedStake(_user) *
-                (rewardPerToken(_rewardTokenIndex) -
-                    userRewardsPerTokenPaid[_rewardTokenIndex][_user])) /
+                (x)) /
                 10**tokenList[_rewardTokenIndex].decimals) +
             tokenRewards[_rewardTokenIndex][_user];
     }
