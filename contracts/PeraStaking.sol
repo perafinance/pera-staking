@@ -5,6 +5,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+/// @author Ulaş Erdoğan
+/// @title Staking Contract with Weights for Multi Asset Gains
+/// @dev Inspired by Synthetix by adding "multi asset rewards" and time weighting
 contract PeraStaking is Ownable {
     /////////// Interfaces & Libraries ///////////
 
@@ -15,17 +18,19 @@ contract PeraStaking is Ownable {
 
     /////////// Structs ///////////
 
+    // Information of reward tokens
     struct TokenInfo {
-        IERC20 tokenInstance; // Token interface of tokens
-        uint256 rewardRate; // Distributing token count per second
-        uint256 rewardPerTokenStored;
+        IERC20 tokenInstance; // ERC-20 interface of tokens
+        uint256 rewardRate; // Distributing count per second
+        uint256 rewardPerTokenStored; // Staking calculation helper
         uint256 deadline; // Deadline of reward distributing
         uint8 decimals; // Decimal count of token
     }
 
+    // Information of users staking details
     struct UserInfo {
-        uint256 userStaked; // User staked balance
-        uint16 userWeights; // User staking coefficient
+        uint256 userStaked; // Staked balance per user
+        uint16 userWeights; // Staking coefficient per user
         uint48 stakedTimestamp; // Staking timestamp of the users
         uint48 userUnlockingTime; // Unlocking timestamp of the users
     }
@@ -38,7 +43,8 @@ contract PeraStaking is Ownable {
     EnumerableSet.UintSet private activeRewards;
 
     // User Data
-    // User variables
+
+    // User data which contains personal variables
     mapping(address => UserInfo) public userData;
     // rewardPerTokenPaid data for each reward tokens
     mapping(uint256 => mapping(address => uint256))
@@ -65,21 +71,36 @@ contract PeraStaking is Ownable {
 
     /////////// Events ///////////
 
+    // User initially stakes token
     event Staked(address _user, uint256 _amount, uint256 _time);
+    //User increases stake amount
     event IncreaseStaked(address _user, uint256 _amount);
+    // User withdraws token before the unlock time
     event PunishedWithdraw(
         address _user,
         uint256 _burntAmount,
         uint256 _amount
     );
+    // User withdraws token on time
     event Withdraw(address _user, uint256 _amount);
+    // User claims rewards
     event Claimed(address _user);
+    // New reward token added by owner
     event NewReward(address _tokenAddress, uint256 _id);
+    // Staking status switched
     event StakeStatusChanged(bool _newStatus);
+    // Emergency status is active
     event EmergencyStatusChanged(bool _newStatus);
 
     /////////// Functions ///////////
 
+    /**
+     * @notice Constructor function - takes the parameters of the competition
+     * @param _mainTokenAddress address - Main staking asset of the contract
+     * @param _punishmentAddress address - Destination address of the cutted tokens
+     * @param _rewardRate uint256 - Main tokens distribution rate per second
+     * @param _lockLimit uint256 - Deadline for stake locks
+     */
     constructor(
         address _mainTokenAddress,
         address _punishmentAddress,
@@ -88,11 +109,11 @@ contract PeraStaking is Ownable {
     ) {
         require(
             _mainTokenAddress != address(0),
-            "Token address can not be 0 address."
+            "[] Token address can not be 0 address."
         );
         require(
             _punishmentAddress != address(0),
-            "Receiver address can not be 0 address."
+            "[] Receiver address can not be 0 address."
         );
         TokenInfo memory info = TokenInfo(
             IERC20(_mainTokenAddress),
@@ -107,15 +128,27 @@ contract PeraStaking is Ownable {
         lockLimit = _lockLimit;
     }
 
+    /**
+     * @notice Direct native coin transfers are closed
+     */
     receive() external payable {
         revert();
     }
 
-    fallback() external  {
+    /**
+     * @notice Direct native coin transfers are closed
+     */
+    fallback() external {
         revert();
     }
 
-    // Starts users stake positions
+    /**
+     * @notice Initializing stake position for users
+     * @dev The staking token need to be approved to the contract by the user
+     * @dev Maximum staking duration is {lockLimit - block.timestamp}
+     * @param _amount uint256 - initial staking amount
+     * @param _time uint256 - staking duration of tokens
+     */
     function initialStake(uint256 _amount, uint256 _time)
         external
         stakeOpen
@@ -123,23 +156,34 @@ contract PeraStaking is Ownable {
     {
         require(
             userData[msg.sender].userUnlockingTime == 0,
-            "Initial stake found!"
+            "[initialStake] Initial stake found!"
         );
-        require(_amount > 0, "Insufficient stake amount.");
-        require(_time > 0, "Insufficient stake time.");
-        require(block.timestamp + _time < lockLimit, "Lock limit exceeded!");
+        require(_amount > 0, "[initialStake] Insufficient stake amount.");
+        require(_time > 0, "[initialStake] Insufficient stake time.");
+        require(
+            block.timestamp + _time < lockLimit,
+            "[initialStake] Lock limit exceeded!"
+        );
 
+        // Sets user data
         userData[msg.sender].userWeights = calcWeight(_time);
         userData[msg.sender].userUnlockingTime = uint48(
             block.timestamp + _time
         );
         userData[msg.sender].stakedTimestamp = uint48(block.timestamp);
+
         wTotalStaked += (userData[msg.sender].userWeights * _amount);
         emit Staked(msg.sender, _amount, _time);
+
+        // Manages internal stake amounts
         _increase(_amount);
     }
 
-    // Edits users stake positions and allow if it's possible
+    /**
+     * @notice Increasing stake position for user
+     * @dev The staking token need to be approved to the contract by the user
+     * @param _amount uint256 - increasing stake amount
+     */
     function additionalStake(uint256 _amount)
         external
         stakeOpen
@@ -147,9 +191,11 @@ contract PeraStaking is Ownable {
     {
         require(
             userData[msg.sender].userUnlockingTime != 0,
-            "Initial stake not found!"
+            "[additionalStake] Initial stake not found!"
         );
-        require(_amount > 0, "Insufficient stake amount.");
+        require(_amount > 0, "[additionalStake] Insufficient stake amount.");
+
+        // Re-calculating weights
         uint16 _additionWeight = calcWeight(
             uint256(userData[msg.sender].userUnlockingTime) - block.timestamp
         );
@@ -160,23 +206,30 @@ contract PeraStaking is Ownable {
         );
         wTotalStaked += uint256(_additionWeight) * _amount;
         emit IncreaseStaked(msg.sender, _amount);
+
+        // Manages internal stake amounts
         _increase(_amount);
     }
 
-    // Unstakes users tokens if the staking period is over or punishes users
+    /**
+     * @notice Withdraws staked position w/o punishments
+     * @dev User gets less token from 75% to 25% if the unlocking time has not reached
+     * @param _amount uint256 - increasing stake amount
+     */
     function withdraw(uint256 _amount) external updateReward(msg.sender) {
         require(
             userData[msg.sender].userStaked >= _amount && _amount > 0,
-            "Insufficient withdraw amount."
+            "[withdraw] Insufficient withdraw amount."
         );
+
         uint256 _punishmentRate = 0;
-        // if staking time is over - free withdrawing
         if (
             block.timestamp >= uint256(userData[msg.sender].userUnlockingTime)
         ) {
+            // Staking time is over - free withdrawing
             emit Withdraw(msg.sender, _amount);
-            // early withdrawing with punishments
         } else {
+            // Early withdrawing with punishments
             _punishmentRate =
                 25 +
                 ((uint256(userData[msg.sender].userUnlockingTime) -
@@ -193,28 +246,41 @@ contract PeraStaking is Ownable {
         }
         wTotalStaked -= uint256(userData[msg.sender].userWeights) * _amount;
 
+        // Deleting staking position if there is no more balance
         if (userData[msg.sender].userStaked == _amount) {
             delete (userData[msg.sender]);
         }
 
+        // Manages internal stake amounts
         _decrease(_amount, _punishmentRate);
     }
 
+    /**
+     * @notice Withdraws all staked position without punishments if emergency status is active
+     * @dev Emergency status can be activated by owner
+     */
     function emergencyWithdraw() external {
-        require(isEmergencyOpen, "Not an emergency status.");
+        require(
+            isEmergencyOpen,
+            "[emergencyWithdraw] Not an emergency status."
+        );
         require(
             userData[msg.sender].userStaked > 0,
-            "No staked balance found ."
+            "[emergencyWithdraw] No staked balance found."
         );
 
         wTotalStaked -=
             uint256(userData[msg.sender].userWeights) *
             userData[msg.sender].userStaked;
         delete (userData[msg.sender]);
+
+        // Manages internal stake amounts
         _decrease(userData[msg.sender].userStaked, 0);
     }
 
-    // Claims users rewards externally or by the other functions before reorganizations
+    /**
+     * @notice Claims actively distributing token rewards
+     */
     function claimAllRewards() external updateReward(msg.sender) {
         for (uint256 i = 0; i < activeRewards.length(); i++) {
             uint256 _reward = tokenRewards[activeRewards.at(i)][msg.sender];
@@ -230,6 +296,11 @@ contract PeraStaking is Ownable {
         emit Claimed(msg.sender);
     }
 
+    /**
+     * @notice Claims specified token rewards
+     * @dev The tokens removed from actively distributing list can only be claimed by this funciton
+     * @param _id uint256 - reward token id
+     */
     function claimSingleReward(uint256 _id) external updateReward(msg.sender) {
         uint256 _reward = tokenRewards[_id][msg.sender];
         if (_reward > 0) {
@@ -240,6 +311,13 @@ contract PeraStaking is Ownable {
         emit Claimed(msg.sender);
     }
 
+    /**
+     * @notice New reward token round can be created by owner
+     * @param _tokenAddress address - Address of the reward token
+     * @param _rewardRate uint256 - Tokens distribution rate per second
+     * @param _deadline uint256 - Tokens last distribution timestamp
+     * @param _decimals uint8 - Tokens decimal count
+     */
     function addNewRewardToken(
         address _tokenAddress,
         uint256 _rewardRate,
@@ -248,8 +326,10 @@ contract PeraStaking is Ownable {
     ) external onlyOwner updateReward(address(0)) {
         require(
             _tokenAddress != address(0),
-            "Token address can not be 0 address."
+            "[addNewRewardToken] Token address can not be 0 address."
         );
+
+        // Creating reward token data
         TokenInfo memory info = TokenInfo(
             IERC20(_tokenAddress),
             _rewardRate,
@@ -264,22 +344,35 @@ contract PeraStaking is Ownable {
         emit NewReward(_tokenAddress, tokenList.length - 1);
     }
 
+    /**
+     * @notice Removes reward token from the actively distributing list
+     * @dev Can only be called after the distribution deadline is over
+     * @dev After this removal, the tokens can not be claimed by [claimAllRewards]
+     * @param _id uint256 - reward token id
+     */
     function delistRewardToken(uint256 _id) external onlyOwner {
         require(
             tokenList[_id].deadline < block.timestamp,
-            "The distribution timeline has not over."
+            "[delistRewardToken] The distribution timeline has not over."
         );
-        require(_id != 0, "Can not delist main token.");
-        require(activeRewards.remove(_id), "Delisting unsuccessful");
+        require(_id != 0, "[delistRewardToken] Can not delist main token.");
+        require(activeRewards.remove(_id), "[delistRewardToken] Delisting unsuccessful");
     }
 
+    /**
+     * @notice Sets emergency status
+     * @dev Only owners can deposit rewards
+     * @dev The depositing token need to be approved to the contract by the user
+     * @param _id uint256 - Reward token id
+     * @param _amount uint256 - Depositing reward token amount
+     */
     function depositRewardTokens(uint256 _id, uint256 _amount)
         external
         onlyOwner
     {
         require(
             activeRewards.contains(_id),
-            "Not an active reward distribution."
+            "[depositRewardTokens] Not an active reward distribution."
         );
 
         tokenList[_id].tokenInstance.safeTransferFrom(
@@ -289,10 +382,25 @@ contract PeraStaking is Ownable {
         );
     }
 
-    function withdrawTokens(address _tokenAddress, uint256 _amount) external onlyOwner {
+    /**
+     * @notice Allows owner to claim all tokens in stuck
+     * @param _tokenAddress address - Address of the reward token
+     * @param _amount uint256 - Withdrawing token amount
+     */
+    function withdrawTokens(address _tokenAddress, uint256 _amount)
+        external
+        onlyOwner
+    {
         IERC20(_tokenAddress).safeTransfer(msg.sender, _amount);
     }
 
+    /**
+     * @notice Allows owner to change the distribution deadline of the tokens
+     * @param _id uint256 - Reward token id
+     * @param _time uint256 - New deadline timestamp
+     * @dev The deadline can only be set to a future timestamp or 0 for unlimited deadline
+     * @dev If the distribution is over, it can not be advanced
+     */
     function changeDeadline(uint256 _id, uint256 _time)
         external
         updateReward(address(0))
@@ -446,3 +554,6 @@ contract PeraStaking is Ownable {
         _;
     }
 }
+// TODO: required token viewer
+// TODO: multi position
+// TODO: increase staking time
