@@ -434,6 +434,10 @@ contract PeraStaking is Ownable {
         punishmentAddress = _newAddress;
     }
 
+    function calcMainAPR(uint256 _weight) external view returns(uint256) {
+        return tokenList[0].rewardRate * 31_556_926 * _weight * 1000 / wTotalStaked;
+    }
+
     // This function returns staking coefficient in the base of 100 (equals 1 coefficient)
     function calcWeight(uint256 _time) public pure returns (uint16) {
         uint256 _stakingDays = _time / 1 days;
