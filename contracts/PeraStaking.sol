@@ -416,7 +416,7 @@ contract PeraStaking is Ownable {
     }
 
     /**
-     * @notice Stops staking by owner authorizaton 
+     * @notice Stops staking by owner authorizaton
      */
     function changeStakeStatus() external onlyOwner {
         isStakeOpen = !isStakeOpen;
@@ -424,17 +424,17 @@ contract PeraStaking is Ownable {
     }
 
     /**
-     * @notice Activates emergency status 
-     * @dev Allows users to withdraw all staked tokens wo punishments  
-     */    
+     * @notice Activates emergency status
+     * @dev Allows users to withdraw all staked tokens wo punishments
+     */
     function changeEmergencyStatus() external onlyOwner {
         isEmergencyOpen = !isEmergencyOpen;
         emit EmergencyStatusChanged(isEmergencyOpen);
     }
 
     /**
-     * @notice Changes the lock limit 
-     * @param _lockLimit uint256 - New lock limit timestamp  
+     * @notice Changes the lock limit
+     * @param _lockLimit uint256 - New lock limit timestamp
      */
     function setLockLimit(uint256 _lockLimit) external onlyOwner {
         lockLimit = _lockLimit;
@@ -457,9 +457,11 @@ contract PeraStaking is Ownable {
      * @notice Calculates the APR of main token staking
      * @param _weight uint256 - User weight to observe APR
      * @dev Min-Max APR can be showed by giving [1000, 2000] as param
-     */   
-    function calcMainAPR(uint256 _weight) external view returns(uint256) {
-        return tokenList[0].rewardRate * 31_556_926 * _weight * 1000 / wTotalStaked;
+     */
+    function calcMainAPR(uint256 _weight) external view returns (uint256) {
+        return
+            (tokenList[0].rewardRate * 31_556_926 * _weight * 1000) /
+            wTotalStaked;
     }
 
     // This function returns staking coefficient in the base of 100 (equals 1 coefficient)
@@ -532,12 +534,12 @@ contract PeraStaking is Ownable {
         view
         returns (uint256)
     {
-        uint x;
-        unchecked {x = rewardPerToken(_rewardTokenIndex) -
-                    userRewardsPerTokenPaid[_rewardTokenIndex][_user];}
+        if (rewardPerToken(_rewardTokenIndex) == 0)
+            return tokenRewards[_rewardTokenIndex][_user];
         return
             ((calcWeightedStake(_user) *
-                (x)) /
+                (rewardPerToken(_rewardTokenIndex) -
+                    userRewardsPerTokenPaid[_rewardTokenIndex][_user])) /
                 10**tokenList[_rewardTokenIndex].decimals) +
             tokenRewards[_rewardTokenIndex][_user];
     }
@@ -564,8 +566,8 @@ contract PeraStaking is Ownable {
      * @param _punishmentRate uint256 - Percentage punishmenent rate to be cutted
      */
     function _decrease(uint256 _amount, uint256 _punishmentRate) private {
-        if(userData[msg.sender].userStaked == _amount) {
-        // If all balance is withdrawn, then the user data is removed
+        if (userData[msg.sender].userStaked == _amount) {
+            // If all balance is withdrawn, then the user data is removed
             delete (userData[msg.sender]);
         } else {
             userData[msg.sender].userStaked -= _amount;
@@ -589,7 +591,7 @@ contract PeraStaking is Ownable {
     /**
      * @notice Updates staking positions
      * @param _user address - Staker address
-     * @dev If the function is called by non-staker, {_user} can be setted to [address(0)] 
+     * @dev If the function is called by non-staker, {_user} can be setted to [address(0)]
      */
     modifier updateReward(address _user) {
         // Iterates all active reward tokens
