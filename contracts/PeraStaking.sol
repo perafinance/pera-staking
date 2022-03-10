@@ -91,6 +91,8 @@ contract PeraStaking is Ownable {
     event StakeStatusChanged(bool _newStatus);
     // Emergency status is active
     event EmergencyStatusChanged(bool _newStatus);
+    // Lock deadline change
+    event LockLimitChanged(uint256 _lockLimit);
 
     /////////// Functions ///////////
 
@@ -277,6 +279,7 @@ contract PeraStaking is Ownable {
      */
     function claimAllRewards() external updateReward(msg.sender) {
         emit Claimed(msg.sender);
+        // Iterates all active reward tokens
         for (uint256 i = 0; i < activeRewards.length(); i++) {
             uint256 _reward = tokenRewards[activeRewards.at(i)][msg.sender];
             if (_reward > 0) {
@@ -412,20 +415,36 @@ contract PeraStaking is Ownable {
         tokenList[_id].deadline = _time;
     }
 
+    /**
+     * @notice Stops staking by owner authorizaton 
+     */
     function changeStakeStatus() external onlyOwner {
         isStakeOpen = !isStakeOpen;
         emit StakeStatusChanged(isStakeOpen);
     }
 
+    /**
+     * @notice Activates emergency status 
+     * @dev Allows users to withdraw all staked tokens wo punishments  
+     */    
     function changeEmergencyStatus() external onlyOwner {
         isEmergencyOpen = !isEmergencyOpen;
         emit EmergencyStatusChanged(isEmergencyOpen);
     }
 
+    /**
+     * @notice Changes the lock limit 
+     * @param _lockLimit uint256 - New lock limit timestamp  
+     */
     function setLockLimit(uint256 _lockLimit) external onlyOwner {
         lockLimit = _lockLimit;
+        emit LockLimitChanged(_lockLimit);
     }
 
+    /**
+     * @notice Sets the punishment address
+     * @param _newAddress address - Destination address of punishment tokens
+     */
     function changePunishmentAddress(address _newAddress) external onlyOwner {
         require(
             _newAddress != address(0),
@@ -434,11 +453,22 @@ contract PeraStaking is Ownable {
         punishmentAddress = _newAddress;
     }
 
+    /**
+     * @notice Calculates the APR of main token staking
+     * @param _weight uint256 - User weight to observe APR
+     * @dev Min-Max APR can be showed by giving [1000, 2000] as param
+     */   
     function calcMainAPR(uint256 _weight) external view returns(uint256) {
         return tokenList[0].rewardRate * 31_556_926 * _weight * 1000 / wTotalStaked;
     }
 
     // This function returns staking coefficient in the base of 100 (equals 1 coefficient)
+    /**
+     * @notice Calculates user staking coefficient (weight) due to staking time
+     * @param _time uint256 - Staking time in seconds
+     * @dev The coefficient is calculated by the formula: [coefficient = (day-90)^2 / 275^2 + 1]
+     * @dev The coefficient is returned by 1000 base (1000 for 1 .... 2000 for 2)
+     */
     function calcWeight(uint256 _time) public pure returns (uint16) {
         uint256 _stakingDays = _time / 1 days;
         if (_stakingDays <= 90) {
@@ -450,16 +480,23 @@ contract PeraStaking is Ownable {
         }
     }
 
-    // This function returns staking coefficient in the base of 100 (equals 1 coefficient)
+    // FIXME: Mock function to be removed
     function calcWeightMock(uint256 _time) public pure returns (uint16) {
         return uint16(_time * 0) + 2000;
     }
 
-    // This function calculates users weighted stakin amounts
+    /**
+     * @notice Calculates users weighted stakin amounts
+     * @param _user address - Stakers address
+     */
     function calcWeightedStake(address _user) public view returns (uint256) {
         return (userData[_user].userWeights * userData[_user].userStaked);
     }
 
+    /**
+     * @notice Staking helper function
+     * @param _rewardTokenIndex uint256 - Reward tokens id
+     */
     function rewardPerToken(uint256 _rewardTokenIndex)
         public
         view
@@ -485,6 +522,11 @@ contract PeraStaking is Ownable {
                 10**tokenList[_rewardTokenIndex].decimals) / wTotalStaked);
     }
 
+    /**
+     * @notice Staking helper function
+     * @param _user address - Stakers address
+     * @param _rewardTokenIndex uint256 - Reward tokens id
+     */
     function earned(address _user, uint256 _rewardTokenIndex)
         public
         view
@@ -500,12 +542,11 @@ contract PeraStaking is Ownable {
             tokenRewards[_rewardTokenIndex][_user];
     }
 
-    /** 
-        These two functions are the actual functions that manages staking positions on back side
-        They will manage users staking amounts with the messages coming from the public ones
-    */
-
     // Increses staking positions of the users - actually "stake" function of general contracts
+    /**
+     * @notice Internally manages stake positions of the users - deposits actual token amounts
+     * @param _amount address - Deposited token amount
+     */
     function _increase(uint256 _amount) private {
         totalStaked += _amount;
         userData[msg.sender].userStaked += _amount;
@@ -517,14 +558,21 @@ contract PeraStaking is Ownable {
     }
 
     // Decreases staking positions of the users - actually "unstake/withdraw" function of general contracts
+    /**
+     * @notice Internally manages stake positions of the users - withdraws actual token amounts
+     * @param _amount address - Withdrawed token amount
+     * @param _punishmentRate uint256 - Percentage punishmenent rate to be cutted
+     */
     function _decrease(uint256 _amount, uint256 _punishmentRate) private {
         if(userData[msg.sender].userStaked == _amount) {
+        // If all balance is withdrawn, then the user data is removed
             delete (userData[msg.sender]);
         } else {
             userData[msg.sender].userStaked -= _amount;
         }
         totalStaked -= _amount;
 
+        // User's early withdraw punishment is cutted
         if (_punishmentRate > 0) {
             uint256 _punishment = (_amount * _punishmentRate) / 100;
             _amount = _amount - _punishment;
@@ -538,7 +586,13 @@ contract PeraStaking is Ownable {
 
     /////////// Modifiers ///////////
 
+    /**
+     * @notice Updates staking positions
+     * @param _user address - Staker address
+     * @dev If the function is called by non-staker, {_user} can be setted to [address(0)] 
+     */
     modifier updateReward(address _user) {
+        // Iterates all active reward tokens
         for (uint256 i = 0; i < activeRewards.length(); i++) {
             uint256 _lastUpdateTime = lastUpdateTime;
             tokenList[activeRewards.at(i)]
@@ -560,6 +614,9 @@ contract PeraStaking is Ownable {
         _;
     }
 
+    /**
+     * @notice Closes token initial and later token staking
+     */
     modifier stakeOpen() {
         require(isStakeOpen, "Not an active staking period.");
         _;
