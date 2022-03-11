@@ -196,6 +196,8 @@ contract PeraStaking is Ownable {
             "[additionalStake] Initial stake not found!"
         );
         require(_amount > 0, "[additionalStake] Insufficient stake amount.");
+        require(userData[msg.sender].userUnlockingTime > block.timestamp,
+            "[additionalStake] Can't increase stake amount after unlocking time!");
 
         // Re-calculating weights
         uint16 _additionWeight = calcWeightMock(
