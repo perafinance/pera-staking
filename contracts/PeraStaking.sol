@@ -216,14 +216,13 @@ contract PeraStaking is Ownable {
     }
 
     /**
-     * @notice Withdraws staked position w/o punishments
+     * @notice Withdraws staked position w/wo punishments
      * @dev User gets less token from 75% to 25% if the unlocking time has not reached
-     * @param _amount uint256 - increasing stake amount
      */
-    function withdraw(uint256 _amount) external updateReward(msg.sender) {
+    function withdraw() external updateReward(msg.sender) {
         require(
-            userData[msg.sender].userStaked >= _amount && _amount > 0,
-            "[withdraw] Insufficient withdraw amount."
+            userData[msg.sender].userStaked > 0,
+            "[withdraw] No staked balance."
         );
 
         uint256 _punishmentRate = 0;
@@ -231,7 +230,7 @@ contract PeraStaking is Ownable {
             block.timestamp >= uint256(userData[msg.sender].userUnlockingTime)
         ) {
             // Staking time is over - free withdrawing
-            emit Withdraw(msg.sender, _amount);
+            emit Withdraw(msg.sender, userData[msg.sender].userStaked);
         } else {
             // Early withdrawing with punishments
             _punishmentRate =
@@ -244,14 +243,14 @@ contract PeraStaking is Ownable {
                 );
             emit PunishedWithdraw(
                 msg.sender,
-                (_amount * _punishmentRate) / 100,
-                (_amount * (100 - _punishmentRate)) / 100
+                (userData[msg.sender].userStaked * _punishmentRate) / 100,
+                (userData[msg.sender].userStaked * (100 - _punishmentRate)) / 100
             );
         }
-        wTotalStaked -= uint256(userData[msg.sender].userWeights) * _amount;
+        wTotalStaked -= uint256(userData[msg.sender].userWeights) * userData[msg.sender].userStaked;
 
         // Manages internal stake amounts
-        _decrease(_amount, _punishmentRate);
+        _decrease(userData[msg.sender].userStaked, _punishmentRate);
     }
 
     /**

@@ -114,7 +114,7 @@ describe("Staking Test for Utku", function () {
 
         it("t = 8", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 8]);
-            await Staking.connect(addr2).withdraw(500);
+            await Staking.connect(addr2).withdraw();
             await Staking.connect(addr2).claimAllRewards();
             await provider.send('evm_mine');
 
@@ -126,15 +126,14 @@ describe("Staking Test for Utku", function () {
 
         it("t = 16", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 16]);
-            await Staking.connect(addr1).withdraw(500);
+            await Staking.connect(addr1).withdraw();
             await Staking.connect(addr1).claimAllRewards();
             await provider.send('evm_mine');
                         
             expect(Number(await Staking.totalStaked())).to.be.equal(0);
             expect(Number(await Staking.wTotalStaked())).to.be.equal(0);
-            console.log(Number(await Pera.balanceOf(addr1.address)), Number(await OthToken.balanceOf(addr1.address)));
-            // expect(userT1Balances[0] + 526).to.be.equal(Number(await Pera.balanceOf(addr1.address)));
-            // expect(userT2Balances[0] + 28).to.be.equal(Number(await OthToken.balanceOf(addr1.address)));
+            expect(userT1Balances[0] + 526).to.be.equal(Number(await Pera.balanceOf(addr1.address)));
+            expect(userT2Balances[0] + 28).to.be.equal(Number(await OthToken.balanceOf(addr1.address)));
         });
     });
 
