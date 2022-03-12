@@ -196,8 +196,10 @@ contract PeraStaking is Ownable {
             "[additionalStake] Initial stake not found!"
         );
         require(_amount > 0, "[additionalStake] Insufficient stake amount.");
-        require(userData[msg.sender].userUnlockingTime > block.timestamp,
-            "[additionalStake] Can't increase stake amount after unlocking time!");
+        require(
+            userData[msg.sender].userUnlockingTime > block.timestamp,
+            "[additionalStake] Can't increase stake amount after unlocking time!"
+        );
 
         // Re-calculating weights
         uint16 _additionWeight = calcWeightMock(
@@ -244,10 +246,13 @@ contract PeraStaking is Ownable {
             emit PunishedWithdraw(
                 msg.sender,
                 (userData[msg.sender].userStaked * _punishmentRate) / 100,
-                (userData[msg.sender].userStaked * (100 - _punishmentRate)) / 100
+                (userData[msg.sender].userStaked * (100 - _punishmentRate)) /
+                    100
             );
         }
-        wTotalStaked -= uint256(userData[msg.sender].userWeights) * userData[msg.sender].userStaked;
+        wTotalStaked -=
+            uint256(userData[msg.sender].userWeights) *
+            userData[msg.sender].userStaked;
 
         // Manages internal stake amounts
         _decrease(userData[msg.sender].userStaked, _punishmentRate);
@@ -299,6 +304,10 @@ contract PeraStaking is Ownable {
      * @param _id uint256 - reward token id
      */
     function claimSingleReward(uint256 _id) external updateReward(msg.sender) {
+        require(
+            activeRewards.contains(_id),
+            "[claimSingleReward] Not an active reward."
+        );
         uint256 _reward = tokenRewards[_id][msg.sender];
         emit Claimed(msg.sender);
         if (_reward > 0) {
@@ -346,7 +355,11 @@ contract PeraStaking is Ownable {
      * @dev After this removal, the tokens can not be claimed by [claimAllRewards]
      * @param _id uint256 - reward token id
      */
-    function delistRewardToken(uint256 _id) external onlyOwner {
+    function delistRewardToken(uint256 _id)
+        external
+        onlyOwner
+        updateReward(address(0))
+    {
         require(
             tokenList[_id].deadline < block.timestamp,
             "[delistRewardToken] The distribution timeline has not over."
@@ -625,6 +638,3 @@ contract PeraStaking is Ownable {
         _;
     }
 }
-// TODO: required token viewer
-// TODO: multi position
-// TODO: increase staking time
