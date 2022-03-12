@@ -34,11 +34,11 @@ describe("Staking Test for Utku", function () {
         [owner, addr1, addr2, punishment] = await ethers.getSigners();
 
         Token = await ethers.getContractFactory("MockToken");
-        Pera = await Token.deploy();
-        OthToken = await Token.deploy();
+        Pera = await Token.connect(owner).deploy();
+        OthToken = await Token.connect(owner).deploy();
 
         PWStaking = await ethers.getContractFactory("PeraStaking");
-        Staking = await PWStaking.deploy(Pera.address, punishment.address, 2, "999999999999999");
+        Staking = await PWStaking.connect(owner).deploy(Pera.address, punishment.address, 2, "999999999999999");
 
         await Pera.connect(owner).approve(Staking.address, ethers.constants.MaxUint256);
         await Pera.connect(addr1).approve(Staking.address, ethers.constants.MaxUint256);
@@ -115,6 +115,8 @@ describe("Staking Test for Utku", function () {
         it("t = 8", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 8]);
             await Staking.connect(addr2).withdraw();
+            // await Staking.connect(addr2).claimSingleReward("0");
+            // await Staking.connect(addr2).claimSingleReward("1");
             await Staking.connect(addr2).claimAllRewards();
             await provider.send('evm_mine');
 
@@ -123,6 +125,12 @@ describe("Staking Test for Utku", function () {
             expect(userT1Balances[1] + 502).to.be.equal(Number(await Pera.balanceOf(addr2.address)));
             expect(userT2Balances[1] + 4).to.be.equal(Number(await OthToken.balanceOf(addr2.address)));
         });
+
+        // it("t = 14", async function () {
+        //     await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 14]);
+        //     await Staking.connect(owner).delistRewardToken("1");
+        //     await provider.send('evm_mine');
+        // });
 
         it("t = 16", async function () {
             await provider.send('evm_setNextBlockTimestamp', [initialTimestamp + 16]);
