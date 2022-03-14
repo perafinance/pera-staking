@@ -50,6 +50,7 @@ describe("Staking Test for Utku", function () {
         await OthToken.connect(owner).approve(Staking.address, ethers.constants.MaxUint256);
 
         await Staking.connect(owner).changeStakeStatus();
+        await Staking.connect(owner).changeClaimStatus();
     });
 
     it("pre-reqs", async function () {

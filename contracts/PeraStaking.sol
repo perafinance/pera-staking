@@ -66,6 +66,8 @@ contract PeraStaking is Ownable {
     address public punishmentAddress;
     // Staking - withdrawing availability
     bool public isStakeOpen;
+    // Claiming availability
+    bool public isClaimOpen;
     // Emergency withdraw availability
     bool public isEmergencyOpen;
 
@@ -89,6 +91,8 @@ contract PeraStaking is Ownable {
     event NewReward(address _tokenAddress, uint256 _id);
     // Staking status switched
     event StakeStatusChanged(bool _newStatus);
+    // Claim status switched
+    event ClaimStatusChanged(bool _newStatus);
     // Emergency status is active
     event EmergencyStatusChanged(bool _newStatus);
     // Lock deadline change
@@ -125,7 +129,7 @@ contract PeraStaking is Ownable {
             18
         );
         tokenList.push(info);
-        activeRewards.add(tokenList.length - 1);
+        require(activeRewards.add(tokenList.length - 1));
         punishmentAddress = _punishmentAddress;
         lockLimit = _lockLimit;
     }
@@ -283,7 +287,7 @@ contract PeraStaking is Ownable {
     /**
      * @notice Claims actively distributing token rewards
      */
-    function claimAllRewards() external updateReward(msg.sender) {
+    function claimAllRewards() external claimOpen updateReward(msg.sender) {
         emit Claimed(msg.sender);
         // Iterates all active reward tokens
         for (uint256 i = 0; i < activeRewards.length(); i++) {
@@ -344,7 +348,7 @@ contract PeraStaking is Ownable {
         );
 
         tokenList.push(info);
-        activeRewards.add(tokenList.length - 1);
+        require(activeRewards.add(tokenList.length - 1));
 
         emit NewReward(_tokenAddress, tokenList.length - 1);
     }
@@ -435,6 +439,13 @@ contract PeraStaking is Ownable {
     function changeStakeStatus() external onlyOwner {
         isStakeOpen = !isStakeOpen;
         emit StakeStatusChanged(isStakeOpen);
+    }
+    /**
+     * @notice Stops staking by owner authorizaton
+     */
+    function changeClaimStatus() external onlyOwner {
+        isClaimOpen = !isClaimOpen;
+        emit ClaimStatusChanged(isStakeOpen);
     }
 
     /**
@@ -635,6 +646,14 @@ contract PeraStaking is Ownable {
      */
     modifier stakeOpen() {
         require(isStakeOpen, "Not an active staking period.");
+        _;
+    }
+
+    /**
+     * @notice Closes token claims
+     */
+    modifier claimOpen() {
+        require(isClaimOpen, "Not an claiming period.");
         _;
     }
 }
