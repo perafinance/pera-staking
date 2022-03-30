@@ -63,7 +63,7 @@ contract PeraStaking is Ownable {
     // Total weighted staked amount
     uint256 public wTotalStaked;
     // Cutted tokens destination address
-    address public punishmentAddress;
+    address public penaltyAddress;
     // Staking - withdrawing availability
     bool public isStakeOpen;
     // Claiming availability
@@ -103,13 +103,13 @@ contract PeraStaking is Ownable {
     /**
      * @notice Constructor function - takes the parameters of the competition
      * @param _mainTokenAddress address - Main staking asset of the contract
-     * @param _punishmentAddress address - Destination address of the cutted tokens
+     * @param _penaltyAddress address - Destination address of the cutted tokens
      * @param _rewardRate uint256 - Main tokens distribution rate per second
      * @param _lockLimit uint256 - Deadline for stake locks
      */
     constructor(
         address _mainTokenAddress,
-        address _punishmentAddress,
+        address _penaltyAddress,
         uint256 _rewardRate,
         uint256 _lockLimit
     ) {
@@ -118,7 +118,7 @@ contract PeraStaking is Ownable {
             "[] 0 address failure."
         );
         require(
-            _punishmentAddress != address(0),
+            _penaltyAddress != address(0),
             "[] 0 address failure."
         );
         TokenInfo memory info = TokenInfo(
@@ -130,7 +130,7 @@ contract PeraStaking is Ownable {
         );
         tokenList.push(info);
         require(activeRewards.add(tokenList.length - 1));
-        punishmentAddress = _punishmentAddress;
+        penaltyAddress = _penaltyAddress;
         lockLimit = _lockLimit;
     }
 
@@ -222,7 +222,7 @@ contract PeraStaking is Ownable {
     }
 
     /**
-     * @notice Withdraws staked position w/wo punishments
+     * @notice Withdraws staked position w/wo penalties
      * @dev User gets less token from 75% to 25% if the unlocking time has not reached
      */
     function withdraw() external updateReward(msg.sender) {
@@ -231,15 +231,15 @@ contract PeraStaking is Ownable {
             "[withdraw] No staked balance."
         );
 
-        uint256 _punishmentRate = 0;
+        uint256 _penaltyRate = 0;
         if (
             block.timestamp >= uint256(userData[msg.sender].userUnlockingTime)
         ) {
             // Staking time is over - free withdrawing
             emit Withdraw(msg.sender, userData[msg.sender].userStaked);
         } else {
-            // Early withdrawing with punishments
-            _punishmentRate =
+            // Early withdrawing with penalties
+            _penaltyRate =
                 25 +
                 ((uint256(userData[msg.sender].userUnlockingTime) -
                     block.timestamp) * 50) /
@@ -249,8 +249,8 @@ contract PeraStaking is Ownable {
                 );
             emit PunishedWithdraw(
                 msg.sender,
-                (userData[msg.sender].userStaked * _punishmentRate) / 100,
-                (userData[msg.sender].userStaked * (100 - _punishmentRate)) /
+                (userData[msg.sender].userStaked * _penaltyRate) / 100,
+                (userData[msg.sender].userStaked * (100 - _penaltyRate)) /
                     100
             );
         }
@@ -259,11 +259,11 @@ contract PeraStaking is Ownable {
             userData[msg.sender].userStaked;
 
         // Manages internal stake amounts
-        _decrease(userData[msg.sender].userStaked, _punishmentRate);
+        _decrease(userData[msg.sender].userStaked, _penaltyRate);
     }
 
     /**
-     * @notice Withdraws all staked position without punishments if emergency status is active
+     * @notice Withdraws all staked position without penalties if emergency status is active
      * @dev Emergency status can be activated by owner
      */
     function emergencyWithdraw() external updateReward(msg.sender) {
@@ -451,7 +451,7 @@ contract PeraStaking is Ownable {
 
     /**
      * @notice Activates emergency status
-     * @dev Allows users to withdraw all staked tokens wo punishments
+     * @dev Allows users to withdraw all staked tokens wo penalties
      */
     function changeEmergencyStatus() external onlyOwner {
         isEmergencyOpen = !isEmergencyOpen;
@@ -473,15 +473,15 @@ contract PeraStaking is Ownable {
     }
 
     /**
-     * @notice Sets the punishment address
-     * @param _newAddress address - Destination address of punishment tokens
+     * @notice Sets the penalty address
+     * @param _newAddress address - Destination address of penalty tokens
      */
-    function changePunishmentAddress(address _newAddress) external onlyOwner {
+    function changePenaltyAddress(address _newAddress) external onlyOwner {
         require(
             _newAddress != address(0),
-            "[changePunishmentAddress] 0 address failure."
+            "[changePenaltyAddress] 0 address failure."
         );
-        punishmentAddress = _newAddress;
+        penaltyAddress = _newAddress;
     }
 
     /**
@@ -612,9 +612,9 @@ contract PeraStaking is Ownable {
     /**
      * @notice Internally manages stake positions of the users - withdraws actual token amounts
      * @param _amount address - Withdrawed token amount
-     * @param _punishmentRate uint256 - Percentage punishmenent rate to be cutted
+     * @param _penaltyRate uint256 - Percentage penalty rate to be cutted
      */
-    function _decrease(uint256 _amount, uint256 _punishmentRate) private {
+    function _decrease(uint256 _amount, uint256 _penaltyRate) private {
         if (userData[msg.sender].userStaked == _amount) {
             // If all balance is withdrawn, then the user data is removed
             delete (userData[msg.sender]);
@@ -623,13 +623,13 @@ contract PeraStaking is Ownable {
         }
         totalStaked -= _amount;
 
-        // User's early withdraw punishment is cutted
-        if (_punishmentRate > 0) {
-            uint256 _punishment = (_amount * _punishmentRate) / 100;
-            _amount = _amount - _punishment;
+        // User's early withdraw penalty is cutted
+        if (_penaltyRate > 0) {
+            uint256 _penalty = (_amount * _penaltyRate) / 100;
+            _amount = _amount - _penalty;
             tokenList[0].tokenInstance.safeTransfer(
-                punishmentAddress,
-                _punishment
+                penaltyAddress,
+                _penalty
             );
         }
         tokenList[0].tokenInstance.safeTransfer(msg.sender, _amount);
