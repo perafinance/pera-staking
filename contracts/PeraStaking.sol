@@ -293,6 +293,13 @@ contract PeraStaking is Ownable {
         for (uint256 i = 0; i < activeRewards.length(); i++) {
             uint256 _reward = tokenRewards[activeRewards.at(i)][msg.sender];
             if (_reward > 0) {
+                if (i == 0) {
+                    require(
+                        (tokenList[0].tokenInstance.balanceOf(address(this)) -
+                            _reward) >= totalStaked,
+                        "[claimAllRewards] Claimable reward balance is not enough."
+                    );
+                }
                 tokenRewards[activeRewards.at(i)][msg.sender] = 0;
                 tokenList[activeRewards.at(i)].tokenInstance.safeTransfer(
                     msg.sender,
@@ -315,6 +322,13 @@ contract PeraStaking is Ownable {
         uint256 _reward = tokenRewards[_id][msg.sender];
         emit Claimed(msg.sender);
         if (_reward > 0) {
+            if (_id == 0) {
+                require(
+                    (tokenList[0].tokenInstance.balanceOf(address(this)) -
+                        _reward) >= totalStaked,
+                    "[claimSingleReward] Claimable reward balance is not enough."
+                );
+            }
             tokenRewards[_id][msg.sender] = 0;
             tokenList[_id].tokenInstance.safeTransfer(msg.sender, _reward);
         }
@@ -409,8 +423,12 @@ contract PeraStaking is Ownable {
         external
         onlyOwner
     {
-        if(_tokenAddress == address(tokenList[0].tokenInstance)) {
-            require((tokenList[0].tokenInstance.balanceOf(address(this)) - _amount) >= totalStaked, "[withdrawStuckTokens] Staked tokens by users can not be withdrawn.");
+        if (_tokenAddress == address(tokenList[0].tokenInstance)) {
+            require(
+                (tokenList[0].tokenInstance.balanceOf(address(this)) -
+                    _amount) >= totalStaked,
+                "[withdrawStuckTokens] Staked tokens by users can not be withdrawn."
+            );
         }
         IERC20(_tokenAddress).safeTransfer(msg.sender, _amount);
     }
@@ -422,6 +440,7 @@ contract PeraStaking is Ownable {
         isStakeOpen = !isStakeOpen;
         emit StakeStatusChanged(isStakeOpen);
     }
+
     /**
      * @notice Stops staking by owner authorizaton
      */
