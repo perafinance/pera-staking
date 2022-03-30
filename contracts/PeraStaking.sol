@@ -446,7 +446,7 @@ contract PeraStaking is Ownable {
      */
     function changeClaimStatus() external onlyOwner {
         isClaimOpen = !isClaimOpen;
-        emit ClaimStatusChanged(isStakeOpen);
+        emit ClaimStatusChanged(isClaimOpen);
     }
 
     /**
