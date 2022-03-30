@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -115,11 +115,11 @@ contract PeraStaking is Ownable {
     ) {
         require(
             _mainTokenAddress != address(0),
-            "[] Token address can not be 0 address."
+            "[] 0 address failure."
         );
         require(
             _punishmentAddress != address(0),
-            "[] Receiver address can not be 0 address."
+            "[] 0 address failure."
         );
         TokenInfo memory info = TokenInfo(
             IERC20(_mainTokenAddress),
@@ -162,10 +162,10 @@ contract PeraStaking is Ownable {
     {
         require(
             userData[msg.sender].userUnlockingTime == 0,
-            "[initialStake] Initial stake found!"
+            "[initialStake] Already staked!"
         );
-        require(_amount > 0, "[initialStake] Insufficient stake amount.");
-        require(_time > 0, "[initialStake] Insufficient stake time.");
+        require(_amount > 0, "[initialStake] Insufficient amount.");
+        require(_time > 0, "[initialStake] Insufficient time.");
         require(
             block.timestamp + _time < lockLimit,
             "[initialStake] Lock limit exceeded!"
@@ -199,10 +199,10 @@ contract PeraStaking is Ownable {
             userData[msg.sender].userUnlockingTime != 0,
             "[additionalStake] Initial stake not found!"
         );
-        require(_amount > 0, "[additionalStake] Insufficient stake amount.");
+        require(_amount > 0, "[additionalStake] Insufficient amount.");
         require(
             userData[msg.sender].userUnlockingTime > block.timestamp,
-            "[additionalStake] Can't increase stake amount after unlocking time!"
+            "[additionalStake] Reached unlocking time!"
         );
 
         // Re-calculating weights
@@ -269,11 +269,11 @@ contract PeraStaking is Ownable {
     function emergencyWithdraw() external updateReward(msg.sender) {
         require(
             isEmergencyOpen,
-            "[emergencyWithdraw] Not an emergency status."
+            "[emergencyWithdraw] Not emergency status."
         );
         require(
             userData[msg.sender].userStaked > 0,
-            "[emergencyWithdraw] No staked balance found."
+            "[emergencyWithdraw] No staked balance."
         );
 
         wTotalStaked -=
@@ -297,7 +297,7 @@ contract PeraStaking is Ownable {
                     require(
                         (tokenList[0].tokenInstance.balanceOf(address(this)) -
                             _reward) >= totalStaked,
-                        "[claimAllRewards] Claimable reward balance is not enough."
+                        "[claimAllRewards] No claimable balance."
                     );
                 }
                 tokenRewards[activeRewards.at(i)][msg.sender] = 0;
@@ -326,7 +326,7 @@ contract PeraStaking is Ownable {
                 require(
                     (tokenList[0].tokenInstance.balanceOf(address(this)) -
                         _reward) >= totalStaked,
-                    "[claimSingleReward] Claimable reward balance is not enough."
+                    "[claimSingleReward] No claimable balance."
                 );
             }
             tokenRewards[_id][msg.sender] = 0;
@@ -349,7 +349,7 @@ contract PeraStaking is Ownable {
     ) external onlyOwner updateReward(address(0)) {
         require(
             _tokenAddress != address(0),
-            "[addNewRewardToken] Token address can not be 0 address."
+            "[addNewRewardToken] 0 address failure."
         );
 
         // Creating reward token data
@@ -380,7 +380,7 @@ contract PeraStaking is Ownable {
     {
         require(
             tokenList[_id].deadline < block.timestamp,
-            "[delistRewardToken] The distribution timeline has not over."
+            "[delistRewardToken] Distr time has not over."
         );
         require(_id != 0, "[delistRewardToken] Can not delist main token.");
         require(
@@ -402,7 +402,7 @@ contract PeraStaking is Ownable {
     {
         require(
             activeRewards.contains(_id),
-            "[depositRewardTokens] Not an active reward distribution."
+            "[depositRewardTokens] Not active reward distr."
         );
 
         tokenList[_id].tokenInstance.safeTransferFrom(
@@ -427,7 +427,7 @@ contract PeraStaking is Ownable {
             require(
                 (tokenList[0].tokenInstance.balanceOf(address(this)) -
                     _amount) >= totalStaked,
-                "[withdrawStuckTokens] Staked tokens by users can not be withdrawn."
+                "[withdrawStuckTokens] Users stakings can not be withdrawn."
             );
         }
         IERC20(_tokenAddress).safeTransfer(msg.sender, _amount);
@@ -479,7 +479,7 @@ contract PeraStaking is Ownable {
     function changePunishmentAddress(address _newAddress) external onlyOwner {
         require(
             _newAddress != address(0),
-            "Receiver address can not be 0 address."
+            "[changePunishmentAddress] 0 address failure."
         );
         punishmentAddress = _newAddress;
     }
