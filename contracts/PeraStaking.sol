@@ -115,11 +115,11 @@ contract PeraStaking is Ownable {
     ) {
         require(
             _mainTokenAddress != address(0),
-            "[] 0 address failure."
+            "[] Address failure."
         );
         require(
             _penaltyAddress != address(0),
-            "[] 0 address failure."
+            "[] Address failure."
         );
         TokenInfo memory info = TokenInfo(
             IERC20(_mainTokenAddress),
@@ -349,7 +349,7 @@ contract PeraStaking is Ownable {
     ) external onlyOwner updateReward(address(0)) {
         require(
             _tokenAddress != address(0),
-            "[addNewRewardToken] 0 address failure."
+            "[addNewRewardToken] Address failure."
         );
 
         // Creating reward token data
@@ -479,7 +479,7 @@ contract PeraStaking is Ownable {
     function changePenaltyAddress(address _newAddress) external onlyOwner {
         require(
             _newAddress != address(0),
-            "[changePenaltyAddress] 0 address failure."
+            "[changePenaltyAddress] Address failure."
         );
         penaltyAddress = _newAddress;
     }
