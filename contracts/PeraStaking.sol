@@ -400,13 +400,18 @@ contract PeraStaking is Ownable {
 
     /**
      * @notice Allows owner to claim all tokens in stuck
+     * @notice The tokens staked by users can not be withdrawn
+     * @notice It only will be used for the tokens for completed claim periods
      * @param _tokenAddress address - Address of the reward token
      * @param _amount uint256 - Withdrawing token amount
      */
-    function withdrawTokens(address _tokenAddress, uint256 _amount)
+    function withdrawStuckTokens(address _tokenAddress, uint256 _amount)
         external
         onlyOwner
     {
+        if(_tokenAddress == address(tokenList[0].tokenInstance)) {
+            require((tokenList[0].tokenInstance.balanceOf(address(this)) - _amount) >= totalStaked, "[withdrawStuckTokens] Staked tokens by users can not be withdrawn.");
+        }
         IERC20(_tokenAddress).safeTransfer(msg.sender, _amount);
     }
 
