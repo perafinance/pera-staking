@@ -266,7 +266,7 @@ contract PeraStaking is Ownable {
      * @notice Withdraws all staked position without punishments if emergency status is active
      * @dev Emergency status can be activated by owner
      */
-    function emergencyWithdraw() external {
+    function emergencyWithdraw() external updateReward(msg.sender) {
         require(
             isEmergencyOpen,
             "[emergencyWithdraw] Not an emergency status."
@@ -411,29 +411,6 @@ contract PeraStaking is Ownable {
     }
 
     /**
-     * @notice Allows owner to change the distribution deadline of the tokens
-     * @param _id uint256 - Reward token id
-     * @param _time uint256 - New deadline timestamp
-     * @dev The deadline can only be set to a future timestamp or 0 for unlimited deadline
-     * @dev If the distribution is over, it can not be advanced
-     */
-    function changeDeadline(uint256 _id, uint256 _time)
-        external
-        updateReward(address(0))
-        onlyOwner
-    {
-        require(
-            _time >= block.timestamp || _time == 0,
-            "Inappropriate timestamp."
-        );
-        require(
-            tokenList[_id].deadline > block.timestamp,
-            "The distribution has over."
-        );
-        tokenList[_id].deadline = _time;
-    }
-
-    /**
      * @notice Stops staking by owner authorizaton
      */
     function changeStakeStatus() external onlyOwner {
@@ -454,6 +431,11 @@ contract PeraStaking is Ownable {
      */
     function changeEmergencyStatus() external onlyOwner {
         isEmergencyOpen = !isEmergencyOpen;
+
+        for (uint256 i = 0; i < activeRewards.length(); i++) {
+            changeDeadline(activeRewards.at(i), block.timestamp);
+        }
+
         emit EmergencyStatusChanged(isEmergencyOpen);
     }
 
@@ -487,6 +469,29 @@ contract PeraStaking is Ownable {
         return
             (tokenList[0].rewardRate * 31_556_926 * _weight * 1000) /
             wTotalStaked;
+    }
+
+    /**
+     * @notice Allows owner to change the distribution deadline of the tokens
+     * @param _id uint256 - Reward token id
+     * @param _time uint256 - New deadline timestamp
+     * @dev The deadline can only be set to a future timestamp or 0 for unlimited deadline
+     * @dev If the distribution is over, it can not be advanced
+     */
+    function changeDeadline(uint256 _id, uint256 _time)
+        public
+        updateReward(address(0))
+        onlyOwner
+    {
+        require(
+            _time >= block.timestamp || _time == 0,
+            "Inappropriate timestamp."
+        );
+        require(
+            tokenList[_id].deadline > block.timestamp,
+            "The distribution has over."
+        );
+        tokenList[_id].deadline = _time;
     }
 
     // This function returns staking coefficient in the base of 100 (equals 1 coefficient)
