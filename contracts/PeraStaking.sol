@@ -172,7 +172,7 @@ contract PeraStaking is Ownable {
         );
 
         // Sets user data
-        userData[msg.sender].userWeights = calcWeightMock(_time);
+        userData[msg.sender].userWeights = calcWeight(_time);
         userData[msg.sender].userUnlockingTime = uint48(
             block.timestamp + _time
         );
@@ -206,7 +206,7 @@ contract PeraStaking is Ownable {
         );
 
         // Re-calculating weights
-        uint16 _additionWeight = calcWeightMock(
+        uint16 _additionWeight = calcWeight(
             uint256(userData[msg.sender].userUnlockingTime) - block.timestamp
         );
         userData[msg.sender].userWeights = uint16(
@@ -505,11 +505,6 @@ contract PeraStaking is Ownable {
         } else {
             return uint16(((1000 * (_stakingDays - 90)**2) / 75625) + 1000);
         }
-    }
-
-    // FIXME: Mock function to be removed
-    function calcWeightMock(uint256 _time) public pure returns (uint16) {
-        return uint16(_time * 0) + 2000;
     }
 
     /**
